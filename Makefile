@@ -12,9 +12,10 @@ PIP := $(VENV_BIN)/pip
 PYTEST := $(VENV_BIN)/pytest
 COCOTB_CONFIG := $(VENV_BIN)/cocotb-config
 RTL_SOURCE := $(RTL_DIR)/full_adder.sv
+ALU_RTL_SOURCE := $(RTL_DIR)/alu.sv
 COCOTB_MAKEFILES := $(shell $(COCOTB_CONFIG) --makefiles 2>/dev/null)
 
-.PHONY: env lint test waves clean check-venv prepare-generated-dirs
+.PHONY: env lint test waves clean check-venv prepare-generated-dirs test-alu waves-alu
 
 env:
 	@printf '%s\n' '=== RV32I project verification environment ==='
@@ -41,6 +42,9 @@ env:
 lint:
 	verilator --lint-only --Wall -Wno-fatal --top-module full_adder '$(RTL_SOURCE)'
 
+lint-alu:
+	verilator --lint-only --Wall -Wno-fatal --top-module alu '$(ALU_RTL_SOURCE)'
+
 check-venv:
 	@test -x '$(PYTHON)' || { echo 'Missing .venv; create it and install requirements.txt.' >&2; exit 1; }
 	@test -x '$(COCOTB_CONFIG)' || { echo 'Missing cocotb in .venv; install requirements.txt.' >&2; exit 1; }
@@ -62,6 +66,20 @@ test: check-venv prepare-generated-dirs
 		SIM_BUILD='$(BUILD_DIR)/verilator-test' \
 		COCOTB_RESULTS_FILE='$(REPORTS_DIR)/full_adder.xml' \
 		'$(REPORTS_DIR)/full_adder.xml'
+
+test-alu: check-venv prepare-generated-dirs
+	@rm -f '$(REPORTS_DIR)/alu.xml'
+	@PATH='$(VENV_BIN)':$$PATH PYTHONPATH='$(TB_DIR)' \
+	COMPILE_ARGS='--Wall -Wno-fatal' \
+	$(MAKE) --no-print-directory -f '$(COCOTB_MAKEFILES)/Makefile.sim' \
+		SIM=verilator \
+		TOPLEVEL_LANG=verilog \
+		VERILOG_SOURCES='$(ALU_RTL_SOURCE)' \
+		COCOTB_TOPLEVEL=alu \
+		COCOTB_TEST_MODULES=test_alu \
+		SIM_BUILD='$(BUILD_DIR)/verilator-alu' \
+		COCOTB_RESULTS_FILE='$(REPORTS_DIR)/alu.xml' \
+		'$(REPORTS_DIR)/alu.xml'
 
 waves: check-venv prepare-generated-dirs
 	@rm -f '$(REPORTS_DIR)/full_adder-waves.xml' dump.fst
@@ -88,6 +106,34 @@ waves: check-venv prepare-generated-dirs
 		if [ $$status -eq 0 ]; then status=1; fi; \
 	fi; \
 	exit $$status
+
+waves-alu: check-venv prepare-generated-dirs
+	@rm -f '$(REPORTS_DIR)/alu-waves.xml' dump.fst
+	@set +e; \
+	PATH='$(VENV_BIN)':$$PATH PYTHONPATH='$(TB_DIR)' \
+	COMPILE_ARGS='--Wall -Wno-fatal --trace-fst' \
+	$(MAKE) --no-print-directory -f '$(COCOTB_MAKEFILES)/Makefile.sim' \
+		SIM=verilator \
+		TOPLEVEL_LANG=verilog \
+		VERILOG_SOURCES='$(ALU_RTL_SOURCE)' \
+		COCOTB_TOPLEVEL=alu \
+		COCOTB_TEST_MODULES=test_alu \
+		COCOTB_TEST_FILTER=test_cases1 \
+		SIM_BUILD='$(BUILD_DIR)/verilator-alu-waves' \
+		COCOTB_RESULTS_FILE='$(REPORTS_DIR)/alu-waves.xml' \
+		WAVES=1 \
+		SIM_ARGS='--trace' \
+		'$(REPORTS_DIR)/alu-waves.xml'; \
+	status=$$?; \
+	if [ -f dump.fst ]; then \
+		mv -f dump.fst '$(WAVES_DIR)/alu.fst'; \
+		printf 'FST waveform: %s\n' '$(WAVES_DIR)/alu.fst'; \
+	else \
+		echo 'Expected FST waveform dump.fst was not generated.' >&2; \
+		if [ $$status -eq 0 ]; then status=1; fi; \
+	fi; \
+	exit $$status
+
 
 clean:
 	@find '$(BUILD_DIR)' '$(REPORTS_DIR)' '$(WAVES_DIR)' \
