@@ -1,10 +1,13 @@
 # P1 Development Progress
 
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 
 ## Current Status
 
-**DAY03 — Register File: COMPLETE**
+**DAY06 — Decoder: COMPLETE**
+
+The component RTL through DAY06 has been independently tested. The processor
+datapath has not yet been integrated.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -60,8 +63,9 @@ RTL lint command executed on 2026-09-12:
 verilator --lint-only --Wall -Wno-fatal --top-module register_file rtl/register_file.sv
 ```
 
-Lint exited successfully. One non-functional warning remains: `rtl/register_file.sv`
-does not currently end with a newline (`EOFNEWLINE`).
+Lint exited successfully. That recorded run reported an `EOFNEWLINE` warning;
+post-DAY03 inspection confirms that `rtl/register_file.sv` now ends with a
+newline, so the warning is no longer part of the current baseline.
 
 Fault injection was completed by the owner. The injected-failure log was not
 retained in this progress record, and a full cross-module regression was not
@@ -79,16 +83,141 @@ required for this DAY03 closeout by current instruction.
 - The Makefile is understood as a reproducible build/test entry point rather than
   a primary RTL design topic.
 
-### Known housekeeping before commit
+### Post-DAY03 baseline
 
-- `tb/test_register_file.py` contains two definitions named
-  `test_write_to_x0_is_ignored`; Python keeps the latter definition. Delete one
-  duplicate block before committing.
-- Add a final newline to `rtl/register_file.sv` to clear the `EOFNEWLINE` warning.
+- Commit `0ad6a81` (`day03: implement and verify register file`) is present on
+  both local `main` and `origin/main`.
+- `tb/test_register_file.py` contains one definition of
+  `test_write_to_x0_is_ignored`.
+- `rtl/register_file.sv` ends with a newline.
+- The repository contains verified component RTL through DAY03, but no
+  integrated processor or instruction-execution claim.
+
+## DAY04 — Program Counter
+
+### Completed deliverables
+
+- `rtl/pc.sv`
+- `tb/test_pc.py`
+- `Makefile` target: `test-pc`
+
+### Implemented behavior
+
+- 32-bit `current_pc` output.
+- Synchronous, active-high reset to zero.
+- Reset has priority over target selection.
+- Sequential update advances the PC by four.
+- `take_target = 1` loads `target_pc` on the next rising edge.
+- 32-bit addition naturally wraps around.
+
+The instruction-memory portion originally associated with instruction fetch is
+deferred and has not been implemented.
+
+### Verification evidence
+
+Command executed on 2026-09-13:
+
+```bash
+make test-pc
+```
+
+Observed result with Verilator 5.050 and cocotb 2.0.1:
+
+- Tests: 3
+- Pass: 3
+- Fail: 0
+- Simulation time: 83 ns
+
+Verified reset, sequential `+4`, target loading, reset priority, and 32-bit
+wraparound. A PC-only Verilator lint run exited with code 0 and no warning.
+
+## DAY05 — Immediate Generator
+
+### Completed deliverables
+
+- `rtl/immediate_generator.sv`
+- `tb/test_immediate_generator.py`
+- `Makefile` target: `test-immediate-generator`
+
+### Implemented behavior
+
+- Internal format codes: I = `2'b00`, S = `2'b01`, B = `2'b10`.
+- Correct I-type sign extension.
+- Correct S-type field reassembly and sign extension.
+- Correct B-type field reassembly and sign extension, with bit 0 fixed to zero.
+- Unsupported format codes produce zero.
+
+U-type and J-type immediates are deferred.
+
+### Verification evidence
+
+Command executed on 2026-09-13:
+
+```bash
+make test-immediate-generator
+```
+
+Observed result:
+
+- cocotb test cases: 1
+- Pass: 1
+- Fail: 0
+- Tested vectors: 6
+- Simulation time: 6 ns
+
+The immediate-generator lint run exited with code 0. Verilator reported a
+nonfatal `UNUSEDSIGNAL` warning for instruction bits `[19:12]` and `[6:0]`,
+which are not consumed by the currently implemented I/S/B formats.
+
+## DAY06 — Decoder
+
+### Completed deliverables
+
+- `rtl/decoder.sv`
+- `tb/test_decoder.py`
+- `Makefile` target: `test-decoder`
+
+### Implemented behavior
+
+- Inputs: `opcode`, `funct3`, and `funct7`.
+- Outputs: register write, ALU-source select, memory write, result-source
+  select, branch, immediate type, and ALU operation.
+- R-type support: ADD, SUB, AND, OR, SLT.
+- I-type support: ADDI, ANDI, ORI, SLTI.
+- Load/store/branch support: LW, SW, BEQ.
+- R-type decoding checks both `funct3` and `funct7` where required.
+- Unsupported or invalid encodings retain safe inactive defaults.
+
+### Verification evidence
+
+Command executed on 2026-09-13:
+
+```bash
+make test-decoder
+```
+
+Observed result:
+
+- cocotb test cases: 1
+- Pass: 1
+- Fail: 0
+- Tested vectors: 9
+- Simulation time: 9 ns
+
+The decoder-only lint run exited with code 0 and no warning. The current nine
+vectors do not directly exercise valid OR or SLT decoding, and no decoder
+random test or fault-injection cycle was required for this closeout.
+
+## Current integration boundary
+
+- No integrated CPU datapath or top-level processor exists yet.
+- Instruction memory and data memory are not implemented.
+- No instruction-level regression has been run.
+- Component-level results must not be interpreted as executing RISC-V programs.
 
 ## Next Starting Point
 
-**DAY04 — Program Counter and Instruction Fetch**
+**DAY07 — Datapath Integration Part 1**
 
-Do not begin DAY04 implementation until its interface, reset behavior, PC update
-rules, and verification plan are agreed in mentor mode.
+Begin by agreeing the initial datapath boundary, module connections, and a
+small integration verification plan in mentor mode.

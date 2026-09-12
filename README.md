@@ -3,10 +3,12 @@
 This repository is a work-in-progress educational project for building an
 RV32I single-cycle processor and verifying its RTL with automated tests.
 
-The processor does **not** exist yet. This bootstrap checkpoint contains only
-the repository infrastructure and an intentionally incomplete one-bit full
-adder smoke test. The full-adder outputs are left as a student TODO, so the
-functional test is expected to fail until `rtl/full_adder.sv` is implemented.
+The integrated processor does **not** exist yet. The current checkpoint has
+completed and independently tested components through DAY06: a one-bit full
+adder, a 32-bit ALU, a 32 x 32-bit register file, a program counter, an I/S/B
+immediate generator, and a decoder for the current instruction subset.
+Instruction memory, data memory, top-level integration, and RISC-V instruction
+execution remain future work.
 
 ## Environment
 
@@ -26,15 +28,20 @@ make lint
 make test
 ```
 
-`make lint` deliberately prints warnings caused by the unimplemented
-full-adder. `make test` must compile the design, start Verilator and cocotb,
-exercise all eight input combinations, and then report functional mismatches
-until the TODO is completed.
-
-After implementing the full adder manually, run:
+Current component verification targets are:
 
 ```sh
-make clean && make lint && make test && make waves
+make lint
+make test
+make lint-alu
+make test-alu
+make test-register-file
+make test-pc
+make test-immediate-generator
+make test-decoder
 ```
+
+These targets verify individual learning components; they do not run an
+integrated CPU or instruction-level regression.
 
 Generated simulator output, reports, caches, and waveforms are ignored by Git.
