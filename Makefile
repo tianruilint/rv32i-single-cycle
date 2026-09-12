@@ -13,9 +13,10 @@ PYTEST := $(VENV_BIN)/pytest
 COCOTB_CONFIG := $(VENV_BIN)/cocotb-config
 RTL_SOURCE := $(RTL_DIR)/full_adder.sv
 ALU_RTL_SOURCE := $(RTL_DIR)/alu.sv
+REGISTER_FILE_RTL_SOURCE := $(RTL_DIR)/register_file.sv
 COCOTB_MAKEFILES := $(shell $(COCOTB_CONFIG) --makefiles 2>/dev/null)
 
-.PHONY: env lint test waves clean check-venv prepare-generated-dirs test-alu waves-alu
+.PHONY: env lint test waves clean check-venv prepare-generated-dirs test-alu waves-alu test-register-file
 
 env:
 	@printf '%s\n' '=== RV32I project verification environment ==='
@@ -80,6 +81,20 @@ test-alu: check-venv prepare-generated-dirs
 		SIM_BUILD='$(BUILD_DIR)/verilator-alu' \
 		COCOTB_RESULTS_FILE='$(REPORTS_DIR)/alu.xml' \
 		'$(REPORTS_DIR)/alu.xml'
+
+test-register-file: check-venv prepare-generated-dirs
+	@rm -f '$(REPORTS_DIR)/register_file.xml'
+	@PATH='$(VENV_BIN)':$$PATH PYTHONPATH='$(TB_DIR)' \
+	COMPILE_ARGS='--Wall -Wno-fatal' \
+	$(MAKE) --no-print-directory -f '$(COCOTB_MAKEFILES)/Makefile.sim' \
+		SIM=verilator \
+		TOPLEVEL_LANG=verilog \
+		VERILOG_SOURCES='$(REGISTER_FILE_RTL_SOURCE)' \
+		COCOTB_TOPLEVEL=register_file \
+		COCOTB_TEST_MODULES=test_register_file \
+		SIM_BUILD='$(BUILD_DIR)/verilator-register-file' \
+		COCOTB_RESULTS_FILE='$(REPORTS_DIR)/register_file.xml' \
+		'$(REPORTS_DIR)/register_file.xml'
 
 waves: check-venv prepare-generated-dirs
 	@rm -f '$(REPORTS_DIR)/full_adder-waves.xml' dump.fst
