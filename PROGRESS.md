@@ -1,13 +1,14 @@
 # P1 Development Progress
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
 
 ## Current Status
 
-**DAY06 — Decoder: COMPLETE**
+**DAY10 — P1 v0.1 Core Integration: COMPLETE**
 
-The component RTL through DAY06 has been independently tested. The processor
-datapath has not yet been integrated.
+The instruction-level single-cycle core supports the planned 12-instruction
+subset and has passed its integrated lint, regression, and waveform runs.
+Program-level execution and the formal P1 v0.1 release remain pending.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -208,16 +209,117 @@ The decoder-only lint run exited with code 0 and no warning. The current nine
 vectors do not directly exercise valid OR or SLT decoding, and no decoder
 random test or fault-injection cycle was required for this closeout.
 
+## DAY07 — Datapath Integration Part 1
+
+### Completed deliverables
+
+- `rtl/rv32i_core.sv`
+- `tb/test_core.py`
+- `Makefile` targets: `lint-core`, `test-core`, and `waves-core`
+
+### Implemented behavior
+
+- Connected the PC, decoder, register file, immediate generator, and ALU.
+- Extracted opcode, funct3, funct7, rs1, rs2, and rd from the instruction.
+- Added the ALU operand-B selection and ALU-result writeback path.
+- Executed and checked ADD, ADDI, SUB, AND, ANDI, OR, ORI, SLT, and SLTI.
+- Prevented register-file writes while reset is asserted.
+
+## DAY08 — Load / Store
+
+### Completed deliverables
+
+- Core data-memory interface: `data_read_data`, `data_addr`,
+  `data_write_data`, and `data_write_en`.
+- `tb/test_lw_sw.py`.
+
+### Implemented behavior
+
+- LW computes `rs1 + immediate`, receives external read data, and selects it
+  for register writeback.
+- SW computes `rs1 + immediate` and exposes the address, rs2 write data, and
+  write-enable signal.
+- The directed test uses a Python dictionary as the external data-memory model;
+  no RTL data-memory module is claimed.
+- The verified sequence stored 42 at byte address 72 and loaded it into x3.
+
+## DAY09 — Branch
+
+### Completed deliverables
+
+- BEQ comparison, branch decision, target-address calculation, and PC control.
+- `tb/test_beq.py`.
+
+### Implemented behavior
+
+- `branch_taken` requires both a decoded BEQ and equal rs1/rs2 values.
+- The taken target is the current branch PC plus the sign-extended B immediate.
+- Tests cover taken, not-taken, and negative-offset branches.
+- Tests check that BEQ does not enable register-file or data-memory writes.
+
+## DAY10 — P1 v0.1 Core Integration
+
+### Supported instruction subset
+
+- ADD, ADDI, SUB
+- AND, ANDI, OR, ORI
+- SLT, SLTI
+- LW, SW
+- BEQ
+
+### Verification evidence
+
+Commands executed on 2026-09-14:
+
+```bash
+make lint-core
+make test-core
+```
+
+Observed core regression result:
+
+- cocotb test cases: 4
+- Pass: 4
+- Fail: 0
+- Skip: 0
+- Simulation time: 284 ns
+
+The four test cases are the arithmetic chain, reset write blocking, LW/SW, and
+BEQ. Together they exercise the 12 supported instruction types; this is not a
+claim of 12 separate tests.
+
+`make lint-core` exited successfully. The remaining nonfatal warning reports
+instruction bits unused by the currently implemented immediate formats.
+
+`make waves-core` was executed on 2026-09-13 with the same four passing test
+cases and generated `waves/core.fst`.
+
+### Actual development bugs resolved
+
+- Register write enable was initially independent of decoder control.
+- The initial ALU/writeback assignment direction was reversed.
+- The first LW/SW test treated a Python memory dictionary as a DUT hierarchy
+  object and supplied load data at the wrong time.
+- The first BEQ attempt used procedural `if` statements at module scope and
+  duplicated PC-update responsibility outside `pc.sv`.
+
+### Git baseline
+
+- Commit `16f4a50` (`day07-10: integrate and verify rv32i core`) is present on
+  local `main` and `origin/main`.
+
 ## Current integration boundary
 
-- No integrated CPU datapath or top-level processor exists yet.
-- Instruction memory and data memory are not implemented.
-- No instruction-level regression has been run.
-- Component-level results must not be interpreted as executing RISC-V programs.
+- The integrated core accepts an external `instr` input; instruction memory is
+  not implemented yet.
+- Data memory is represented by an external cocotb model, not an RTL module.
+- Instruction-level sequences are automated, but PC-indexed program execution
+  has not been completed.
+- P1 v0.1 has not reached its formal DAY14 release.
 
 ## Next Starting Point
 
-**DAY07 — Datapath Integration Part 1**
+**DAY11 — Program Execution**
 
-Begin by agreeing the initial datapath boundary, module connections, and a
-small integration verification plan in mentor mode.
+Begin DAY11 by defining a PC-indexed instruction-memory model and one small
+program whose final register and memory state can be checked automatically.

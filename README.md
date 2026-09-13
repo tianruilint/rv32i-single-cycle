@@ -3,12 +3,22 @@
 This repository is a work-in-progress educational project for building an
 RV32I single-cycle processor and verifying its RTL with automated tests.
 
-The integrated processor does **not** exist yet. The current checkpoint has
-completed and independently tested components through DAY06: a one-bit full
-adder, a 32-bit ALU, a 32 x 32-bit register file, a program counter, an I/S/B
-immediate generator, and a decoder for the current instruction subset.
-Instruction memory, data memory, top-level integration, and RISC-V instruction
-execution remain future work.
+The current checkpoint has completed DAY10 and integrates the program counter,
+decoder, register file, immediate generator, ALU, load/store interface,
+writeback selection, and BEQ branch path in `rtl/rv32i_core.sv`.
+
+The instruction-level core currently supports this 12-instruction subset:
+
+- ADD, ADDI, SUB
+- AND, ANDI, OR, ORI
+- SLT, SLTI
+- LW, SW
+- BEQ
+
+This is not yet the formal P1 v0.1 release. The instruction is currently driven
+through the core's external `instr` input, and cocotb supplies the external data
+memory behavior. PC-indexed instruction-memory execution, program-level tests,
+release documentation, and the initial synthesis pass remain future work.
 
 ## Environment
 
@@ -39,9 +49,14 @@ make test-register-file
 make test-pc
 make test-immediate-generator
 make test-decoder
+make lint-core
+make test-core
+make waves-core
 ```
 
-These targets verify individual learning components; they do not run an
-integrated CPU or instruction-level regression.
+`make test-core` runs the current integrated instruction-level regression.
+The latest observed DAY10 run completed four cocotb test cases with four passes
+and no failures. Those test cases collectively cover the 12 instruction types
+listed above; four test cases must not be interpreted as 12 separate tests.
 
 Generated simulator output, reports, caches, and waveforms are ignored by Git.
