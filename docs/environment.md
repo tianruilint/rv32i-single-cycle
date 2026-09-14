@@ -1,4 +1,64 @@
-# Day 0 Environment Audit
+# Project Environment Audit
+
+## Current DAY14 audit — 2026-09-15
+
+The authoritative checkout is `D:\projects\rv32i-single-cycle`, mounted at
+`/mnt/d/projects/rv32i-single-cycle` in WSL distribution `Ubuntu-24.04`.
+The ChatGPT project's synced mirror is a read-only reference, not the checkout.
+
+`make env` was rerun successfully; its output is retained locally as
+`reports/day14-environment.log`.
+
+| Tool/check | Observed result |
+| --- | --- |
+| WSL Git | 2.43.0 |
+| GNU Make | 4.3 |
+| Verilator | 5.050, revision v5.050 |
+| System `python3 --version` | 3.12.3 |
+| Project `.venv/bin/python --version` | 3.12.3 |
+| Project pip | 26.2.1 |
+| Project pytest | 8.3.5 |
+| Project cocotb | 2.0.1 |
+| GTKWave | 3.3.116 |
+| Yosys | 0.33, git sha1 2584903a060 |
+| RISC-V GCC | riscv64-unknown-elf GCC 13.2.0 |
+| RISC-V objdump | binutils 2.42 |
+| WSL GitHub CLI | 2.98.0; existing login available for repository Git operations |
+
+The cocotb embedded-Python startup separately reports Python 3.12.4, while the
+shell version commands above report 3.12.3. Both observations are preserved;
+this closeout did not investigate or change interpreter/library linkage.
+The latest seven-group regression passed 19/19 cases in this environment.
+
+System PATH does not provide pytest/cocotb-config, which is expected: the
+Makefile uses the project-local `.venv`. Do not reinstall working dependencies.
+The RISC-V toolchain is installed, but v0.1 programs are literal instruction
+words in Python; automatic assembly/image generation is not implemented.
+No STA tool/library/constraint setup is validated at this checkpoint.
+
+### Git authentication used for closeout
+
+Windows Git could not complete a noninteractive pull with its current credential
+helper. The existing WSL GitHub CLI login worked. A one-command credential
+helper override was used; no token was written into the repository and no
+global Git setting was changed. Fast-forward-only pull reported
+`Already up to date.` before documentation edits.
+
+If the same local setup needs the existing WSL CLI credential helper, run from
+the repository root in WSL:
+
+```sh
+git -c credential.helper= -c 'credential.helper=!gh auth git-credential' pull --ff-only
+```
+
+Do not start a new login or copy credentials unnecessarily. Commit and push
+remain explicit user actions/authorizations; the current DAY14 session has
+authorization for a combined commit and push, but not a tag or release.
+
+## Historical Day 0 audit
+
+The following is the original bootstrap record, not a description of current
+RTL completeness, GitHub CLI availability, or current regression status.
 
 Audit date: 2026-08-30 (Asia/Shanghai)
 

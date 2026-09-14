@@ -1,14 +1,20 @@
 # P1 Development Progress
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 ## Current Status
 
-**DAY10 — P1 v0.1 Core Integration: COMPLETE**
+**DAY14 / P1 v0.1 — technical and documentation checkpoint closed.**
 
-The instruction-level single-cycle core supports the planned 12-instruction
-subset and has passed its integrated lint, regression, and waveform runs.
-Program-level execution and the formal P1 v0.1 release remain pending.
+The 12-instruction single-cycle subset executes PC-indexed programs using
+external Python instruction/data memories. The latest full regression passed
+19/19 cases across seven groups. Lint warnings were reviewed and generic Yosys
+synthesis passed. v0.2-v0.5 are plans only; no corresponding RTL was added.
+
+The owner authorized a combined code/documentation commit and push for this
+closeout. No Git tag or GitHub Release was requested. Use `git log`, remote
+verification, and the final closeout message for the resulting commit; this
+document does not equate a version label with a published release tag.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -111,8 +117,8 @@ required for this DAY03 closeout by current instruction.
 - `take_target = 1` loads `target_pc` on the next rising edge.
 - 32-bit addition naturally wraps around.
 
-The instruction-memory portion originally associated with instruction fetch is
-deferred and has not been implemented.
+At DAY04, the instruction-memory portion was deferred. DAY11 later supplied
+a PC-indexed Python instruction-memory model; no RTL instruction ROM is claimed.
 
 ### Verification evidence
 
@@ -308,18 +314,158 @@ cases and generated `waves/core.fst`.
 - Commit `16f4a50` (`day07-10: integrate and verify rv32i core`) is present on
   local `main` and `origin/main`.
 
-## Current integration boundary
+## DAY11 — PC-indexed Program Execution
 
-- The integrated core accepts an external `instr` input; instruction memory is
-  not implemented yet.
-- Data memory is represented by an external cocotb model, not an RTL module.
-- Instruction-level sequences are automated, but PC-indexed program execution
-  has not been completed.
-- P1 v0.1 has not reached its formal DAY14 release.
+Owner-written deliverable: `tb/test_program.py`, included in the default
+`CORE_TEST_MODULES` by the Makefile.
 
-## Next Starting Point
+- `test_program`: PC-indexed ADDI/ADDI/ADD program; `x3=12`, `PC=12`.
+- `test_program2`: loop, SW to byte address 64, LW into x3, end sentinel PC=32.
+  The saved version initializes the counter to 0 and verifies
+  `x1=x2=x3=memory[64]=0`. A 40-iteration bound plus final PC assertion detects
+  failure to reach the expected endpoint.
+- The initial-5 version previously passed with `x1=0`, `x2=x3=memory[64]=15`,
+  `PC=32`. The retained six-case report is
+  `reports/day11-program2-review2/core.xml` (586 ns total).
+  Initial 5 is historical evidence, not a separate current regression case.
+- Initial 1 was explicitly skipped by the owner. Do not silently add or claim it.
 
-**DAY11 — Program Execution**
+Actual bug: a DUT `LogicArray` was used as a dictionary key, producing
+`TypeError: unhashable type: 'LogicArray'` in `test_program2` at 241 ns.
+The failure is retained in `reports/day11-program2-review1/core.xml`.
+The owner converted the address to `int`, supplied load data to the DUT input,
+and kept memory sampling/updates aligned with settling and the committing edge.
+See `docs/bug_diary.md` for the evidence boundary.
 
-Begin DAY11 by defining a PC-indexed instruction-memory model and one small
-program whose final register and memory state can be checked automatically.
+The initial-zero waveform run passed 1/1 selected case (51 ns):
+`reports/day11-zero-wave/core-waves.xml` and
+`waves/day11-zero-wave/core.fst` (1931 bytes). The inspected PC sequence was
+`0 -> 4 -> 8 -> 24 -> 28 -> 32`; SW/LW used address 64 and data 0.
+This is a historical trace, not a new waveform run during DAY14.
+
+## DAY12 — One-command Regression
+
+The owner rebuilt `scripts/run_regression.py` incrementally in mentor mode
+after rejecting an earlier complete assistant implementation.
+
+Implemented: invoke seven Make targets, inspect return codes, read XML cases,
+count failure/error/skipped elements, track failed targets, print totals,
+return a process status, save per-target stdout/stderr logs, and forward a
+chosen `COCOTB_RANDOM_SEED`.
+
+Latest closeout command executed on 2026-09-15:
+
+```sh
+make regression SEED=20260915
+```
+
+| Group | Cases | Pass | Fail | Skip |
+| --- | ---: | ---: | ---: | ---: |
+| Full adder | 1 | 1 | 0 | 0 |
+| ALU | 2 | 2 | 0 | 0 |
+| Register file | 5 | 5 | 0 | 0 |
+| PC | 3 | 3 | 0 | 0 |
+| Immediate generator | 1 | 1 | 0 | 0 |
+| Decoder | 1 | 1 | 0 | 0 |
+| Core | 6 | 6 | 0 | 0 |
+| **Total** | **19** | **19** | **0** | **0** |
+
+Exit status: 0. Core simulated time: 386 ns. Seven logs under
+`reports/regression/` confirm supplied cocotb seed 20260915. The ALU's separate
+`random.Random(20260906)` remains independently fixed. Nineteen cases do not
+mean nineteen instructions, nineteen vectors, or exhaustive coverage.
+
+`read_report()` was also run on the real historical failure report and returned
+`(2, 1, 1)` for total/failed/skipped. Runner make-failure, missing/malformed XML,
+empty-report, and skipped-case exit paths are reviewed but not all dynamically
+validated. On make failure the runner skips XML parsing; totals describe reports
+actually parsed, while `Failed targets` determines overall failure.
+
+Deferred: assembly-to-image automation, per-run manifest/history, and automatic
+failure-wave generation. These are not prerequisites for resuming owner-written
+instruction extensions. Current logs overwrite the previous same-target logs.
+
+## DAY13 — Lint and Generic Synthesis
+
+Executed with Verilator 5.050 and Yosys 0.33; rerun and preserved at DAY14.
+
+- `make lint-core`: exit 0, one `UNUSEDSIGNAL` warning for the immediate
+  generator's `instr[19:12,6:0]`. Reviewed against I/S/B bit extraction; accepted
+  without disabling the warning. No RTL change was needed.
+- Yosys `synth -top rv32i_core; check -assert; stat`: exit 0, structural check
+  reports 0 problems; no latch inferred from the combinational processes.
+- Hierarchical total: 5314 generic cells; register file: 1024 enabled flip-flops
+  and 1984 MUX cells; PC: 32 flip-flops. Memory objects after mapping: 0.
+- Saved logs: `reports/lint/day13-core.log`,
+  `reports/synthesis/day13-core.log`.
+- Saved generated netlist: `build/synthesis/rv32i_core.v`.
+- Reproduction, hierarchy, and limitations: `docs/synthesis.md`.
+
+These are generic structural results, not technology-mapped area, SRAM count,
+Fmax, timing closure, or functional equivalence. No STA or gate-level regression
+has been performed.
+
+Learning evidence: the owner identified flip-flops as state and the 32x32 array
+as 1024 bits. Address-controlled read selection, the MUX count, and the
+distinction between simulation/lint/synthesis were explained. A complete
+independent oral explanation has not been assessed; do not claim mastery solely
+from tool success.
+
+## DAY14 — v0.1 Documentation and Git Closeout
+
+Owner instruction: stop at v0.1, comprehensively update repository documents,
+then commit and push the existing DAY11–12 work and documentation together.
+The earlier word "pull" was corrected by the owner to "push".
+
+Before edits, an explicitly requested fast-forward-only pull used the existing
+WSL GitHub CLI login and reported `Already up to date.` The pre-closeout local
+HEAD was `6118046`; `origin/main` was `16f4a50`. Local changes were preserved.
+
+Updated the README, implemented specification, project plan, progress record,
+environment notes, and real bug diary. Added datapath, control table,
+verification scope, synthesis reproduction, and concise learning-boundary
+documents. Saved tool evidence under ignored generated-output directories.
+No v0.2 instruction support, RTL redesign, or test-logic replacement was made.
+
+Git commit/push completion is verified separately after all document edits.
+No tag or GitHub Release is part of this authorization.
+
+## Current integration boundary and open work
+
+- Core instruction and data ports connect to external Python memory models.
+- PC-indexed program execution is implemented; there is no RTL memory macro.
+- Default regression retains initial 0, not both initial 0 and initial 5.
+- Initial 1 is intentionally unverified. The full runner error-path matrix,
+  exhaustive ISA/invalid-encoding coverage, and whole-core reference interpreter
+  are not implemented/verified.
+- No byte/halfword addressing contract, jump/U/J support, bus handshake, trap,
+  pipeline, STA, physical area, or Fmax claim.
+- Reports, netlists, and waves are ignored by Git; tracked documents preserve
+  the commands and observed summaries. Future runs regenerate local evidence.
+
+## Next-session handoff — start v0.2, not DAY11
+
+DAY: DAY14 / v0.1 closeout.
+
+Completed: 12-instruction core, program tests, one-command regression with logs
+and seed, reviewed lint, generic synthesis, and checkpoint documentation.
+
+Owner work demonstrated: RTL and primary test development; PC-indexed
+instruction driving; memory-model corrections; regression runner construction.
+Concepts discussed but not fully orally assessed are identified in DAY13 above.
+
+Actual verification: 19/19 cases, seven groups, exit 0; reviewed lint warning;
+Yosys structural check 0 problems. No initial-1, STA, or Fmax evidence.
+
+Actual bug fixed: DAY11 `LogicArray` dictionary key and correct memory-model
+driving/sampling; earlier integration bugs remain recorded under DAY10.
+
+Next start: v0.2-A XOR/XORI/SLTU/SLTIU. ALU operations already exist; inspect
+`rtl/decoder.sv` and let the owner add decoding and main test expectations.
+Then add shift instructions, followed by v0.3 branches and v0.4 subword memory.
+The next session, not this closeout, begins implementation.
+
+Read first: `PROJECT_PLAN.md`, `docs/specification.md`, this handoff, and relevant
+RTL/tests. Preserve mentor mode; do not repeat completed exercises or turn
+auxiliary Python plumbing into the main learning task. Document edits and Git
+operations still follow the owner's explicit scope and authorization.

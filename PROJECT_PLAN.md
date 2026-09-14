@@ -6,6 +6,32 @@
 >
 > Every Codex session MUST read this file before modifying the project.
 
+## Current checkpoint and session boundary — 2026-09-15
+
+**Stop at DAY14 / P1 v0.1 for this session.** The owner will start a new
+conversation for v0.2, v0.3, and v0.4. Do not implement those features during
+the v0.1 documentation/Git closeout.
+
+- Implemented: the 12-instruction single-cycle subset, PC-indexed Python
+  instruction memory, external Python data memory, and program-level tests.
+- Latest full regression: seven groups, 19/19 cocotb cases, 0 failed/skipped,
+  exit status 0; seed forwarding and seven per-target logs verified.
+- Lint: one reviewed immediate-generator `UNUSEDSIGNAL` warning, no error.
+- Generic Yosys synthesis: 5314 generic cells, no inferred combinational latch,
+  `check -assert` reports 0 problems. No technology-specific area or STA claim.
+- Current saved loop test uses initial 0. Initial 5 passed historically but is
+  not retained as a separate default case. Initial 1 remains explicitly skipped.
+- DAY12 assembler-to-image automation is deferred, not completed. Automatic
+  failure-wave generation was optional and is not implemented.
+- v0.1 is a local technical/documentation checkpoint. Commit/push are separately
+  authorized for this closeout; no Git tag or GitHub Release is requested.
+
+Authority order: latest explicit owner instruction, latest agreed milestone
+scope, this plan, then older chat/history. `docs/specification.md` describes
+implemented behavior; `PROGRESS.md` records evidence and the next-session start.
+Historical DAY entries below remain the original learning sequence, not a
+claim that each must be repeated or occupy a calendar day.
+
 ---
 
 # 0. Project Overview
@@ -187,6 +213,10 @@ Required modules:
 - Writeback logic
 - Branch logic
 - Top-level processor integration
+
+For v0.1, instruction memory is satisfied by the PC-indexed cocotb/Python model;
+it is not an RTL ROM. The data-memory model also remains external. This boundary
+must appear in specifications, diagrams, and any project description.
 
 Required verification:
 
@@ -826,6 +856,7 @@ README should contain:
 
 Target long-term structure:
 
+```text
 rv32i-single-cycle/
 ├── README.md
 ├── PROJECT_PLAN.md
@@ -1303,6 +1334,12 @@ Verify architectural state at program completion.
 
 ## DAY12 — Regression Infrastructure
 
+Closeout scope: one-command execution, XML case statistics, failure-target
+reporting, per-target logs, and cocotb seed forwarding are implemented.
+Automatic assembly/program-image build remains deferred; current programs are
+machine-word dictionaries. Wave generation remains an explicit user command.
+See `docs/verification_plan.md` for runner limitations and actual results.
+
 Improve:
 
 - automatic program build;
@@ -1334,6 +1371,12 @@ Do not suppress errors blindly.
 
 ## DAY14 — P1 v0.1 Release
 
+2026-09-15 decision: close v0.1 here, update the repository documentation, and
+commit/push the owner-written DAY11–12 work together with the documentation.
+Do not create a Git tag or GitHub Release without a separate request. A dirty
+worktree before the authorized closeout commit is not a completed Git handoff.
+Future implementation belongs to a new conversation.
+
 Deliver:
 
 - working CPU;
@@ -1354,32 +1397,35 @@ After v0.1 is stable:
 
 Expand instruction support systematically.
 
-Suggested sequence:
+The following v0.2-v0.5 names label the original Phase A-D work; they are
+intermediate checkpoints on the path to v1.0, not implemented features.
 
-Phase A:
+| Milestone | Scope | Main owner-written work |
+| --- | --- | --- |
+| v0.2 / Phase A | XOR/XORI, shifts, SLTU/SLTIU | Decoder extension, shift-encoding qualification, instruction tests |
+| v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests |
+| v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests |
+| v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests |
+| v1.0 | Stable expanded single-cycle CPU | Verification gaps, RTL fixes, reproducible synthesis and basic STA |
+| v2.0 | Five-stage pipeline, after the v1.0 stability gate | Pipeline registers, forwarding, hazards, stall/bubble/flush, tests |
 
-- XOR / XORI
-- shifts
-- SLTU / SLTIU
+### Next-session starting task: v0.2
 
-Phase B:
+1. Read the v0.1 handoff in `PROGRESS.md` and confirm the checkout/remote state.
+2. Inspect `rtl/alu.sv`, `rtl/decoder.sv`, `tb/test_decoder.py`, and
+   `tb/test_core.py`; run the baseline regression if RTL/tests changed.
+3. First group: XOR, XORI, SLTU, SLTIU. The ALU operations already exist;
+   the owner supplies the missing decoder controls and primary tests.
+4. Second group: SLL/SRL/SRA and SLLI/SRLI/SRAI. Review shift amounts and
+   legal immediate-shift encodings before changing RTL.
+5. Do not start branches or subword memory until each current group has its
+   directed/boundary tests and regression closed.
 
-- BNE
-- BLT
-- BGE
-- BLTU
-- BGEU
-
-Phase C:
-
-- byte/halfword load/store
-
-Phase D:
-
-- LUI
-- AUIPC
-- JAL
-- JALR
+The owner knows C and is learning Python as a verification tool. Group related
+instructions to keep progress fast. Do not repeat completed DAY11 exercises,
+turn routine report parsing into a separate course, or add unrequested tests.
+Keep core RTL, important reference expectations, and primary tests owner-written.
+Auxiliary changes may be assisted within explicit authorization.
 
 For every new instruction:
 
@@ -1568,7 +1614,14 @@ Codex may:
 - propose design alternatives;
 - ask the owner to choose between architectural options.
 
-Codex may implement small mechanical changes after explaining them.
+These capabilities are not blanket write permission. In mentor mode, provide
+specifications, TODOs, and staged review; the owner writes core RTL and primary
+test logic. Direct RTL/test replacement requires an explicit request. Document
+updates, Git commits, pushes, tags, and releases each require applicable owner
+authorization. Do not treat a request to run tests as permission to change them.
+
+For this DAY14 closeout, documentation updates and a combined commit/push are
+authorized; v0.2+ implementation and release-tag creation are not.
 
 ---
 
