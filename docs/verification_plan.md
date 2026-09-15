@@ -1,6 +1,6 @@
-# v0.1 Verification Plan and Evidence
+# v0.2 Verification Plan and Evidence
 
-Checkpoint: 2026-09-15. Results below are observed, not proposed coverage.
+Checkpoint: 2026-09-16. Results below are observed, not proposed coverage.
 
 ## Layers and responsibilities
 
@@ -22,7 +22,7 @@ functional/line/branch coverage measurement in this checkpoint.
 Executed from the repository root in WSL:
 
 ```sh
-make regression SEED=20260915
+make regression SEED=20260916
 ```
 
 | Target | Test source | XML under reports/ | Cases / pass / fail / skip |
@@ -33,12 +33,13 @@ make regression SEED=20260915
 | test-pc | test_pc.py | pc.xml | 3 / 3 / 0 / 0 |
 | test-immediate-generator | test_immediate_generator.py | immediate_generator.xml | 1 / 1 / 0 / 0 |
 | test-decoder | test_decoder.py | decoder.xml | 1 / 1 / 0 / 0 |
-| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 6 / 6 / 0 / 0 |
-| **Total** | | | **19 / 19 / 0 / 0** |
+| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 8 / 8 / 0 / 0 |
+| **Total** | | | **21 / 21 / 0 / 0** |
 
-Exit status: 0. The core suite's simulated duration is 386 ns. Test count is
-distinct from vector count and instruction count. The ALU's 19 directed vectors
-and 2000 seeded vectors are grouped into two cocotb cases, not 2019 cases.
+Exit status: 0. Test count is distinct from vector count and instruction count.
+The ALU's 19 directed vectors and 2000 seeded vectors are grouped into two
+cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
+22 legal and boundary instruction vectors.
 
 ## Core cases and architectural expectations
 
@@ -50,8 +51,10 @@ and 2000 seeded vectors are grouped into two cocotb cases, not 2019 cases.
 | test_beq | Taken +8, not taken, negative -12 branch; a taken BEQ's write enables are checked inactive |
 | test_program | Fetch at PC 0/4/8; final x3=12, PC=12 |
 | test_program2 | Current initial-0 program exits loop, stores/loads 0 at byte address 64, ends at PC=32 |
+| test_xor_sltu_instrs | XOR/XORI and SLTU/SLTIU results, including unsigned ordering and sign-extended immediate behavior |
+| test_shift_instrs | SLL/SLLI, SRL/SRLI, SRA/SRAI; shift amount 31, register source 32, final PC=52, and `data_write_en=0` |
 
-This exercises the 12 supported instruction types, but does not prove all their
+This exercises the 22 supported instruction types, but does not prove all their
 input combinations or all side effects under every condition. In particular,
 not every unsupported encoding, reset/memory interaction, or alignment case is
 tested. Current tests inspect internal register storage for some assertions;
@@ -62,7 +65,7 @@ that hierarchy is a test dependency, not a stable external hardware interface.
 | Initial counter | Evidence | Current default case? |
 | --- | --- | --- |
 | 5 | Historical DAY11 run: x1=0, x2=x3=memory[64]=15, PC=32; six-case report passed, 586 ns | No; later replaced by initial 0 |
-| 0 | Latest six-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
+| 0 | Latest eight-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
 | 1 | Explicitly skipped by the owner | No; unverified |
 
 Initial-5 historical XML: `reports/day11-program2-review2/core.xml`.
@@ -111,7 +114,7 @@ immutable run archive is generated. A failure opening a log or launching Make
 is not handled by the report-parsing exception handler.
 
 `--seed` is parsed by the runner and passed through the subprocess environment
-as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260915`.
+as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260916`.
 `random.Random(20260906)` in the ALU test is independently seeded. Reproduction
 also requires the same source, test selection, and compatible toolchain; the
 seed alone is not a complete environment record.
@@ -129,7 +132,7 @@ To focus on the currently saved zero-initialized program:
 make waves-core CORE_TEST_MODULES=test_program COCOTB_TEST_FILTER=test_program2
 ```
 
-These are reproduction instructions; DAY14 did not rerun the historical zero
+These are reproduction instructions; DAY15 did not rerun the historical zero
 waveform or open GTKWave. Automatic waveform generation on failure is not
 implemented. Wave targets share `dump.fst`; do not run them concurrently.
 

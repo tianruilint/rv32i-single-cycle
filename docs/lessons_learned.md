@@ -1,6 +1,6 @@
-# v0.1 Learning and Ownership Notes
+# v0.2 Learning and Ownership Notes
 
-Recorded at DAY14, 2026-09-15. These are topics practiced or explained, not a
+Recorded at DAY15, 2026-09-16. These are topics practiced or explained, not a
 claim that every topic has passed an independent oral assessment.
 
 ## Owner-written work
@@ -37,6 +37,24 @@ the owner; no existing third-party CPU implementation was imported.
   different quantities. Historical evidence must not be relabeled as current
   default regression coverage.
 
+## v0.2 instruction-group lessons
+
+- Signed `SLT/SLTI` and unsigned `SLTU/SLTIU` use different comparison
+  interpretations even though both return only 0 or 1. `SLTIU` still receives
+  a sign-extended immediate before the unsigned comparison.
+- Register shifts use only the low five bits of the shift source in RV32. A
+  register value of 32 therefore behaves as a shift amount of 0.
+- `SRL/SRLI` fill with zero, while `SRA/SRAI` preserve the sign bit for a
+  signed right shift.
+- Ordinary I-type upper bits are immediate data. SLLI/SRLI/SRAI are the special
+  I-type forms whose upper field must be qualified as `0000000` or `0100000`.
+- `reg_write` controls the register-file write port. `data_write_en` is the
+  external data-memory write signal used by SW; an ALU instruction should not
+  assert the latter.
+- The new owner-written decoder test remains one cocotb case containing 22
+  vectors; instruction count, vector count, and cocotb case count remain
+  separate evidence categories.
+
 ## Explicit remaining understanding checks
 
 The owner recognized state storage and the 32x32 bit count. The explanation
@@ -55,4 +73,5 @@ and important test logic. Explain Python through the owner's C background when
 needed. Auxiliary argument parsing, log formatting, and Git commands are not
 separate line-by-line assignments. Group related instructions, preserve actual
 verification, honor explicitly skipped cases, and start at the nearest unfinished
-feature. v0.2 implementation begins in the next conversation, not this closeout.
+feature. v0.3 branch implementation begins in the next conversation, not this
+closeout.

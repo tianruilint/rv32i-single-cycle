@@ -3,18 +3,19 @@
 An owner-written educational 32-bit single-cycle CPU with automated
 SystemVerilog/Verilator/cocotb verification.
 
-**Current checkpoint: DAY14 / P1 v0.1, closed on 2026-09-15.**
+**Current checkpoint: DAY15 / P1 v0.2, closed on 2026-09-16.**
 This is a verified **RV32I-subset** core, not a complete RV32I implementation.
-v0.2 and later work has not started. Version names identify development
+v0.3 and later work has not started. Version names identify development
 milestones; no Git tag or GitHub Release is implied.
 
 ## Implemented scope
 
-The integrated core supports these **12 instruction types**:
+The integrated core supports these **22 instruction types**:
 
 - ADD, ADDI, SUB
-- AND, ANDI, OR, ORI
-- SLT, SLTI
+- AND, ANDI, OR, ORI, XOR, XORI
+- SLT, SLTI, SLTU, SLTIU
+- SLL, SLLI, SRL, SRLI, SRA, SRAI
 - LW, SW
 - BEQ
 
@@ -23,8 +24,10 @@ ALU, load/store interface, writeback selection, and BEQ path. Instruction and
 data memories are **external Python models**, not synthesized RAM modules.
 The program tests fetch instruction words using the DUT's `current_pc`.
 
-The ALU also implements XOR, shifts, and unsigned comparison at component level.
-Their CPU instruction decoding is not implemented in v0.1.
+The v0.2 decoder now selects XOR/XORI, unsigned comparisons, and register or
+immediate shifts. Immediate shifts qualify the upper immediate bits according
+to the RV32I encoding; ordinary I-type arithmetic continues to treat those
+bits as immediate data.
 Read the [specification](docs/specification.md),
 [datapath diagram](docs/datapath.md), and
 [control table](docs/control_table.md) for the precise boundary.
@@ -51,16 +54,16 @@ Do not recreate an existing working environment. Normal checks are:
 ```sh
 make env
 make lint-core
-make regression SEED=20260915
+make regression SEED=20260916
 ```
 
 `make regression` runs all seven test groups, reports case counts and failed
 targets, and returns a nonzero status on a detected failure. It must run from
 the repository root. `make test` alone still tests **only the full adder**.
 
-## Verified v0.1 results
+## Verified v0.2 results
 
-Full regression rerun on 2026-09-15:
+Full regression rerun on 2026-09-16:
 
 | Target | cocotb cases | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -70,16 +73,20 @@ Full regression rerun on 2026-09-15:
 | `test-pc` | 3 | 3 | 0 | 0 |
 | `test-immediate-generator` | 1 | 1 | 0 | 0 |
 | `test-decoder` | 1 | 1 | 0 | 0 |
-| `test-core` | 6 | 6 | 0 | 0 |
-| **Total** | **19** | **19** | **0** | **0** |
+| `test-core` | 8 | 8 | 0 | 0 |
+| **Total** | **21** | **21** | **0** | **0** |
 
 The process exited with status 0. These are test-case counts, not instruction
 counts or coverage percentages. Core simulation time was 386 ns; this is not
 an implementation-performance measurement.
 
-The six core cases check arithmetic, reset write blocking, LW/SW, BEQ,
-PC-indexed straight-line execution, and a zero-initialized loop/store/load
-program. The straight-line program finishes with `x3=12`, `PC=12`.
+The eight core cases check arithmetic, reset write blocking, LW/SW, BEQ,
+PC-indexed straight-line execution, a zero-initialized loop/store/load
+program, XOR/unsigned comparisons, and the register/immediate shift group.
+The shift case includes shift amount 31 and a register shift source of 32 to
+verify RV32's low-five-bit rule; it also checks that these ALU instructions do
+not assert `data_write_en`. The straight-line program finishes with
+`x3=12`, `PC=12`.
 The currently saved second program finishes with
 `x1=x2=x3=memory[64]=0`, `PC=32`.
 
@@ -91,7 +98,7 @@ and remains unverified. See the
 
 Each group refreshes its XML in `reports/`. The runner saves stdout and stderr
 to `reports/regression/<target>.log`, overwriting that target's previous log.
-All seven latest logs confirm supplied cocotb seed `20260915`.
+All seven latest logs confirm supplied cocotb seed `20260916`.
 The ALU's independent reference-vector generator uses fixed seed `20260906`;
 changing `SEED` does not change that generator.
 
@@ -124,9 +131,9 @@ No warning class was disabled. `-Wno-fatal` keeps warnings visible while
 allowing the command to complete; status 0 does not mean warning-free RTL.
 
 Generic Yosys synthesis and `check -assert` succeeded with 0 reported structural
-problems. The recorded hierarchy contains **5314 generic cells**, including
-1024 register-file enabled flip-flops and 32 PC flip-flops. No latch was inferred
-from the combinational processes. These are tool/run-specific structural
+problems. The v0.2 hierarchy contains **5372 generic cells**, including
+1024 register-file enabled flip-flops, 32 PC flip-flops, and 151 decoder cells.
+No latch was inferred from the combinational processes. These are tool/run-specific structural
 counts, **not silicon area or Fmax**. No target technology library, STA,
 post-layout timing, or gate-level equivalence result is claimed.
 
@@ -134,8 +141,8 @@ The [synthesis record](docs/synthesis.md) contains the exact command, hierarchy,
 warning disposition, and reproduction instructions. Generated evidence:
 
 - `reports/lint/day13-core.log`
-- `reports/synthesis/day13-core.log`
-- `build/synthesis/rv32i_core.v` (generated netlist, not hand-written source)
+- `reports/synthesis/v0.2-core.log`
+- `build/synthesis/v0.2-rv32i_core.v` (generated netlist, not hand-written source)
 
 ## Repository map
 
@@ -145,13 +152,13 @@ warning disposition, and reproduction instructions. Generated evidence:
 | `tb/` | cocotb component, instruction, and program tests |
 | `scripts/run_regression.py` | Test scheduling, XML statistics, logs, seed forwarding |
 | `docs/` | Implemented specification, architecture, verification, and debug evidence |
-| `PROJECT_PLAN.md` | Scope, mentor rules, and staged v0.2+ plan |
+| `PROJECT_PLAN.md` | Scope, mentor rules, and staged v0.3+ plan |
 | `PROGRESS.md` | Historical results and next-session handoff |
 | `build/`, `reports/`, `waves/` | Reproducible generated artifacts, ignored by Git |
 
 ## Limitations and next session
 
-- Only the 12 listed instruction types are supported; no jump, upper-immediate,
+- Only the 22 listed instruction types are supported; no jump, upper-immediate,
   subword memory, remaining branch, CSR, trap, interrupt, or privileged support.
 - Memory has no ready/valid protocol or variable latency; tests supply reads
   before the committing clock edge and model writes at the edge.
@@ -165,9 +172,9 @@ warning disposition, and reproduction instructions. Generated evidence:
   exercised end-to-end. XML-reader failure/skipped counting was checked using
   a retained real failure report.
 
-Stop this session at **DAY14 / v0.1**. Start a new session with
+Stop this session at **DAY15 / v0.2**. Start the next session with
 `PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before beginning
-v0.2 (logic/shifts/unsigned comparison), then v0.3 (branches) and v0.4
+v0.3 (branches) and v0.4
 (byte/halfword memory). Core RTL and primary verification logic remain the
 owner's work; auxiliary tooling is not a separate line-by-line course.
 

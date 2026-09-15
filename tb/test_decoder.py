@@ -6,6 +6,11 @@ ALU_SUB  = 0x1
 ALU_AND  = 0x2
 ALU_OR   = 0x3
 ALU_SLT  = 0x8
+ALU_XOR  = 0x4
+ALU_SLTU = 0x9
+ALU_SLL = 0x5
+ALU_SRL = 0x6
+ALU_SRA = 0x7
 
 IMM_I = 0X0
 IMM_S = 0X1
@@ -28,7 +33,16 @@ async def test_decoder(dut):
         (1, 1, 0, 0, 0, IMM_I, ALU_ADD)),
 
         (0x13, 0b100, 0b0000000,
-        (0, 0, 0, 0, 0, IMM_I, ALU_ADD)),
+        (1, 1, 0, 0, 0, IMM_I, ALU_XOR)),
+
+        (0x33, 0b100, 0b0000000,
+        (1, 0, 0, 0, 0, IMM_I, ALU_XOR)),
+
+        (0x33, 0b011, 0b0000000,
+        (1, 0, 0, 0, 0, IMM_I, ALU_SLTU)),
+
+        (0x13, 0b011, 0b0000000,
+        (1, 1, 0, 0, 0, IMM_I, ALU_SLTU)),
 
         (0x03, 0b010, 0b0000000,
         (1, 1, 0, 1, 0, IMM_I, ALU_ADD)),
@@ -40,6 +54,36 @@ async def test_decoder(dut):
         (0, 0, 0, 0, 1, IMM_B, ALU_SUB)),
 
         (0x7f, 0b000, 0b0000000,
+        (0, 0, 0, 0, 0, IMM_I, ALU_ADD)),
+
+        (0x33, 0b100, 0b0100000,
+        (0, 0, 0, 0, 0, IMM_I, ALU_ADD)),
+
+        (0x13, 0b100, 0b1111111,
+        (1, 1, 0, 0, 0, IMM_I, ALU_XOR)),
+
+        (0x33, 0b001, 0b0000000,
+        (1, 0, 0, 0, 0, IMM_I, ALU_SLL)),
+
+        (0x33, 0b101, 0b0000000,
+        (1, 0, 0, 0, 0, IMM_I, ALU_SRL)),
+
+        (0x33, 0b101, 0b0100000,
+        (1, 0, 0, 0, 0, IMM_I, ALU_SRA)),
+
+        (0x13, 0b001, 0b0000000,
+        (1, 1, 0, 0, 0, IMM_I, ALU_SLL)),
+
+        (0x13, 0b101, 0b0000000,
+        (1, 1, 0, 0, 0, IMM_I, ALU_SRL)),
+
+        (0x13, 0b101, 0b0100000,
+        (1, 1, 0, 0, 0, IMM_I, ALU_SRA)),
+
+        (0x13, 0b001, 0b0100000,
+        (0, 0, 0, 0, 0, IMM_I, ALU_ADD)),
+
+        (0x13, 0b101, 0b0000001,
         (0, 0, 0, 0, 0, IMM_I, ALU_ADD)),
     ]
 

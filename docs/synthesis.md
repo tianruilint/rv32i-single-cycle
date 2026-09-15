@@ -1,4 +1,6 @@
-# DAY13 / v0.1 Synthesis Record
+# Single-cycle Synthesis Record
+
+## Historical v0.1 run
 
 First run and closeout reproduction: 2026-09-15, WSL Ubuntu-24.04.
 Top: `rv32i_core`. The six source files below are the hand-written core and its
@@ -94,3 +96,34 @@ The 10 ns cocotb clock is not a frequency result. A plausible single-cycle load
 path is register file -> ALU -> external data memory -> writeback; measuring it
 requires a defined memory implementation/timing model, library, and constraints.
 Basic STA remains part of the later v1.0 engineering work.
+
+## v0.2 rerun
+
+Reproduced on 2026-09-16 with the same WSL Ubuntu-24.04 toolchain after the
+decoder extension. The command was:
+
+```sh
+yosys -Q -T -l reports/synthesis/v0.2-core.log -p 'read_verilog -sv rtl/rv32i_core.sv rtl/pc.sv rtl/decoder.sv rtl/register_file.sv rtl/immediate_generator.sv rtl/alu.sv; synth -top rv32i_core; check -assert; stat; write_verilog -noattr build/synthesis/v0.2-rv32i_core.v'
+```
+
+The command exited 0. The generated log and netlist are ignored artifacts at
+`reports/synthesis/v0.2-core.log` and
+`build/synthesis/v0.2-rv32i_core.v`.
+
+| Scope | Cells |
+| --- | ---: |
+| alu | 1483 |
+| decoder | 151 |
+| immediate_generator | 78 |
+| pc | 143 |
+| register_file | 3167 |
+| rv32i_core, direct contents | 355, including five child instances |
+| **Full hierarchy, primitive total** | **5372** |
+
+The hierarchy calculation is `1483 + 151 + 78 + 143 + 3167 + (355 - 5) =
+5372`. The register-file and PC storage counts remain 1024 enabled flip-flops
+and 32 flip-flops, respectively. The full hierarchy has 0 memory objects;
+`check -assert` reports 0 problems; and the combinational conversions report no
+inferred latch. These are generic structural observations only. No
+technology-specific area, Fmax, slack, STA, placement, routing, or gate-level
+equivalence claim is made.

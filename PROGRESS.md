@@ -1,18 +1,18 @@
 # P1 Development Progress
 
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 
 ## Current Status
 
-**DAY14 / P1 v0.1 — technical and documentation checkpoint closed.**
+**DAY15 / P1 v0.2 — technical and documentation checkpoint closed.**
 
-The 12-instruction single-cycle subset executes PC-indexed programs using
+The 22-instruction single-cycle subset executes PC-indexed programs using
 external Python instruction/data memories. The latest full regression passed
-19/19 cases across seven groups. Lint warnings were reviewed and generic Yosys
-synthesis passed. v0.2-v0.5 are plans only; no corresponding RTL was added.
+21/21 cases across seven groups. Lint warnings were reviewed and generic Yosys
+synthesis passed. v0.3-v0.5 remain planned; no later-version RTL was added.
 
 The owner authorized a combined code/documentation commit and push for this
-closeout. No Git tag or GitHub Release was requested. Use `git log`, remote
+v0.2 closeout. No Git tag or GitHub Release was requested. Use `git log`, remote
 verification, and the final closeout message for the resulting commit; this
 document does not equate a version label with a published release tag.
 
@@ -430,6 +430,65 @@ No v0.2 instruction support, RTL redesign, or test-logic replacement was made.
 Git commit/push completion is verified separately after all document edits.
 No tag or GitHub Release is part of this authorization.
 
+## DAY15 — P1 v0.2 Logic, Unsigned Comparison, and Shift Instructions
+
+Closed on 2026-09-16. This checkpoint extends the owner-written single-cycle
+decoder and core tests without starting branches, subword memory, jumps, or the
+pipeline.
+
+### Owner-written deliverables
+
+- `rtl/decoder.sv`: CPU-level decode for XOR/XORI, SLTU/SLTIU, SLL/SLLI,
+  SRL/SRLI, and SRA/SRAI.
+- `tb/test_decoder.py`: legal R/I encodings plus invalid immediate-shift
+  `funct7` boundaries. This is one cocotb case containing 22 vectors.
+- `tb/test_core.py`: integrated XOR/unsigned-comparison and shift execution
+  tests, including shift amount 31 and a register shift source of 32.
+
+### Verification evidence
+
+Full regression executed on 2026-09-16:
+
+```sh
+make regression SEED=20260916
+```
+
+| Group | Cases | Pass | Fail | Skip |
+| --- | ---: | ---: | ---: | ---: |
+| Full adder | 1 | 1 | 0 | 0 |
+| ALU | 2 | 2 | 0 | 0 |
+| Register file | 5 | 5 | 0 | 0 |
+| PC | 3 | 3 | 0 | 0 |
+| Immediate generator | 1 | 1 | 0 | 0 |
+| Decoder | 1 | 1 | 0 | 0 |
+| Core | 8 | 8 | 0 | 0 |
+| **Total** | **21** | **21** | **0** | **0** |
+
+Exit status: 0. `make lint-core` also exited 0 with the previously reviewed
+nonfatal immediate-generator `UNUSEDSIGNAL` warning. The v0.2 Yosys rerun
+reported 0 structural problems from `check -assert`, no inferred latch, and
+5372 generic cells in the full hierarchy. These are generic structural counts,
+not technology-specific area, Fmax, or STA evidence.
+
+### Bug found and fixed
+
+An invalid immediate-shift encoding was initially accepted because the decoder
+treated the shift-immediate `funct7`-like field as don't-care. The owner added
+the required `0000000` qualification for SLLI/SRLI and `0100000` qualification
+for SRAI, then added illegal-encoding vectors. Ordinary I-type arithmetic still
+treats the upper immediate bits as data. The targeted decoder failure and the
+fix are recorded in `docs/bug_diary.md`.
+
+### Knowledge and boundary
+
+The owner implemented the core decoder/test changes and reviewed the distinction
+between register write enable and the external memory `data_write_en`, signed
+versus unsigned comparison, logical versus arithmetic right shift, and RV32's
+low-five-bit register shift amount rule. Initial-1 loop behavior remains
+explicitly unverified. There is still no byte/halfword memory, remaining branch
+group, U/J instruction, whole-core reference interpreter, formal proof, STA,
+physical area, or Fmax result.
+
 ## Current integration boundary and open work
 
 - Core instruction and data ports connect to external Python memory models.
@@ -443,29 +502,35 @@ No tag or GitHub Release is part of this authorization.
 - Reports, netlists, and waves are ignored by Git; tracked documents preserve
   the commands and observed summaries. Future runs regenerate local evidence.
 
-## Next-session handoff — start v0.2, not DAY11
+## Next-session handoff — start v0.3, not DAY11
 
-DAY: DAY14 / v0.1 closeout.
+DAY: DAY15 / v0.2 closeout.
 
-Completed: 12-instruction core, program tests, one-command regression with logs
-and seed, reviewed lint, generic synthesis, and checkpoint documentation.
+Completed: 22-instruction single-cycle core, XOR/unsigned-comparison and shift
+tests, one-command regression with logs and seed, reviewed lint, v0.2 generic
+synthesis, and checkpoint documentation.
 
-Owner work demonstrated: RTL and primary test development; PC-indexed
-instruction driving; memory-model corrections; regression runner construction.
-Concepts discussed but not fully orally assessed are identified in DAY13 above.
+Owner work demonstrated: decoder extension, primary cocotb expectations,
+shift-boundary testing, PC-indexed instruction driving, and memory-model
+corrections. The owner has not claimed an independent whole-core reference
+model, formal proof, STA, or physical PPA result.
 
-Actual verification: 19/19 cases, seven groups, exit 0; reviewed lint warning;
-Yosys structural check 0 problems. No initial-1, STA, or Fmax evidence.
+Actual verification: 21/21 cases, seven groups, exit 0; core 8/8; reviewed
+lint warning; Yosys structural check 0 problems and 5372 generic cells. No
+initial-1, STA, or Fmax evidence.
 
-Actual bug fixed: DAY11 `LogicArray` dictionary key and correct memory-model
-driving/sampling; earlier integration bugs remain recorded under DAY10.
+Actual v0.2 bug fixed: invalid immediate-shift `funct7` values were accepted;
+SLLI/SRLI/SRAI now require their legal upper encodings. The DAY11 `LogicArray`
+memory-model issue and earlier integration bugs remain recorded above and in
+`docs/bug_diary.md`.
 
-Next start: v0.2-A XOR/XORI/SLTU/SLTIU. ALU operations already exist; inspect
-`rtl/decoder.sv` and let the owner add decoding and main test expectations.
-Then add shift instructions, followed by v0.3 branches and v0.4 subword memory.
-The next session, not this closeout, begins implementation.
+Next start: v0.3 branches — BNE, BLT, BGE, BLTU, and BGEU. First inspect
+`rtl/decoder.sv`, `rtl/rv32i_core.sv`, `tb/test_decoder.py`, and
+`tb/test_beq.py`; define signed/unsigned comparison and taken/not-taken
+expectations before changing branch RTL. Do not start v0.4 subword memory until
+the branch group has its directed and boundary tests and regression closeout.
 
-Read first: `PROJECT_PLAN.md`, `docs/specification.md`, this handoff, and relevant
-RTL/tests. Preserve mentor mode; do not repeat completed exercises or turn
-auxiliary Python plumbing into the main learning task. Document edits and Git
-operations still follow the owner's explicit scope and authorization.
+Read first: `PROJECT_PLAN.md`, `docs/specification.md`, this handoff, and the
+current RTL/tests. Preserve mentor mode; do not repeat completed exercises or
+turn auxiliary Python plumbing into the main learning task. Document edits and
+Git operations still follow the owner's explicit scope and authorization.

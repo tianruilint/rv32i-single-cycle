@@ -1,8 +1,13 @@
-# v0.1 Single-cycle Datapath
+# v0.2 Single-cycle Datapath
 
-Implemented checkpoint: DAY14, 2026-09-15. Source top: `rtl/rv32i_core.sv`.
+Implemented checkpoint: DAY15, 2026-09-16. Source top: `rtl/rv32i_core.sv`.
 The boxes inside the core are synthesizable logic. Both memory models below
 are cocotb/Python testbench components, not RTL RAMs.
+
+The v0.2 datapath keeps the v0.1 single-cycle structure. The decoder now
+selects XOR, unsigned comparison, and register/immediate shift operations;
+branches, subword memory, jumps, and pipeline registers remain outside this
+checkpoint.
 
 ```mermaid
 flowchart LR
@@ -73,7 +78,7 @@ Neither register-file nor memory writes are enabled by BEQ.
 
 ## Why an array becomes flip-flops and MUXes
 
-`register_file.sv` declares 32 words of 32 bits. The DAY13 generic synthesis
+`register_file.sv` declares 32 words of 32 bits. The v0.2 generic synthesis
 reported 1024 enabled single-bit flip-flops and 1984 MUXes in this module.
 Two independent read addresses require two data-selection networks. A binary
 32-to-1 selection tree has 31 two-input MUXes per bit; `31 * 32 * 2 = 1984`

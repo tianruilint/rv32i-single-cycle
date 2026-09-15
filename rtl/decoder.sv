@@ -23,6 +23,11 @@ localparam logic [3:0] ALU_SUB = 4'b0001;
 localparam logic [3:0] ALU_AND = 4'b0010;
 localparam logic [3:0] ALU_OR  = 4'b0011;
 localparam logic [3:0] ALU_SLT = 4'b1000;
+localparam logic [3:0] ALU_XOR = 4'b0100;
+localparam logic [3:0] ALU_SLTU = 4'b1001;
+localparam logic [3:0] ALU_SLL = 4'b0101;
+localparam logic [3:0] ALU_SRL = 4'b0110;
+localparam logic [3:0] ALU_SRA = 4'b0111;
 
 localparam logic [1:0] IMM_I = 2'b00;
 localparam logic [1:0] IMM_S = 2'b01;
@@ -60,6 +65,26 @@ always_comb begin
                     reg_write = 1'b1;
                     alu_op    = ALU_SLT;
                 end
+                {7'b0000000, 3'b100}: begin
+                    reg_write = 1'b1;
+                    alu_op    = ALU_XOR;
+                end
+                {7'b0000000, 3'b011}: begin
+                    reg_write = 1'b1;
+                    alu_op    = ALU_SLTU;
+                end
+                {7'b0000000, 3'b001}: begin
+                    reg_write = 1'b1;
+                    alu_op    = ALU_SLL;
+                end
+                {7'b0000000, 3'b101}: begin
+                    reg_write = 1'b1;
+                    alu_op    = ALU_SRL;
+                end
+                {7'b0100000, 3'b101}: begin
+                    reg_write = 1'b1;
+                    alu_op    = ALU_SRA;
+                end
                 default: begin
                 end
             endcase
@@ -90,6 +115,40 @@ always_comb begin
                     alu_src   = 1'b1;
                     imm_type  = IMM_I;
                     alu_op    = ALU_SLT;
+                end
+                3'b100: begin
+                    reg_write = 1'b1;
+                    alu_src   = 1'b1;
+                    imm_type  = IMM_I;
+                    alu_op    = ALU_XOR;
+                end
+                3'b011: begin
+                    reg_write = 1'b1;
+                    alu_src   = 1'b1;
+                    imm_type  = IMM_I;
+                    alu_op    = ALU_SLTU;
+                end
+                3'b001: begin
+                    if (funct7 == 7'b0000000) begin
+                        reg_write = 1'b1;
+                        alu_src   = 1'b1;
+                        imm_type  = IMM_I;
+                        alu_op    = ALU_SLL;
+                    end
+                end
+                3'b101: begin
+                    if (funct7 == 7'b0100000) begin
+                        alu_op = ALU_SRA;
+                        reg_write = 1'b1;
+                        alu_src   = 1'b1;
+                        imm_type  = IMM_I;
+                    end
+                    else if (funct7 == 7'b0000000) begin
+                        alu_op = ALU_SRL;
+                        reg_write = 1'b1;
+                        alu_src   = 1'b1;
+                        imm_type  = IMM_I;
+                    end
                 end
                 default: begin
                 end

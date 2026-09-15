@@ -1,13 +1,14 @@
 # Project Environment Audit
 
-## Current DAY14 audit — 2026-09-15
+## Current DAY15 audit — 2026-09-16
 
 The authoritative checkout is `D:\projects\rv32i-single-cycle`, mounted at
 `/mnt/d/projects/rv32i-single-cycle` in WSL distribution `Ubuntu-24.04`.
 The ChatGPT project's synced mirror is a read-only reference, not the checkout.
 
-`make env` was rerun successfully; its output is retained locally as
-`reports/day14-environment.log`.
+The v0.2 regression, lint, and synthesis checks used this same verified
+environment; no toolchain change was made. The previous `make env` output is
+retained locally as `reports/day14-environment.log`.
 
 | Tool/check | Observed result |
 | --- | --- |
@@ -28,11 +29,11 @@ The ChatGPT project's synced mirror is a read-only reference, not the checkout.
 The cocotb embedded-Python startup separately reports Python 3.12.4, while the
 shell version commands above report 3.12.3. Both observations are preserved;
 this closeout did not investigate or change interpreter/library linkage.
-The latest seven-group regression passed 19/19 cases in this environment.
+The latest seven-group v0.2 regression passed 21/21 cases in this environment.
 
 System PATH does not provide pytest/cocotb-config, which is expected: the
 Makefile uses the project-local `.venv`. Do not reinstall working dependencies.
-The RISC-V toolchain is installed, but v0.1 programs are literal instruction
+The RISC-V toolchain is installed, but current programs are literal instruction
 words in Python; automatic assembly/image generation is not implemented.
 No STA tool/library/constraint setup is validated at this checkpoint.
 
@@ -52,7 +53,7 @@ git -c credential.helper= -c 'credential.helper=!gh auth git-credential' pull --
 ```
 
 Do not start a new login or copy credentials unnecessarily. Commit and push
-remain explicit user actions/authorizations; the current DAY14 session has
+remain explicit user actions/authorizations; the current DAY15 session has
 authorization for a combined commit and push, but not a tag or release.
 
 ## Historical Day 0 audit
