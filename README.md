@@ -3,31 +3,33 @@
 An owner-written educational 32-bit single-cycle CPU with automated
 SystemVerilog/Verilator/cocotb verification.
 
-**Current checkpoint: DAY15 / P1 v0.2, closed on 2026-09-16.**
+**Current checkpoint: DAY16 / P1 v0.3 implementation checkpoint,
+documented on 2026-09-19.**
 This is a verified **RV32I-subset** core, not a complete RV32I implementation.
-v0.3 and later work has not started. Version names identify development
-milestones; no Git tag or GitHub Release is implied.
+Version names identify development milestones; no Git tag or GitHub Release is
+implied.
 
 ## Implemented scope
 
-The integrated core supports these **22 instruction types**:
+The integrated core supports these **27 instruction types**:
 
 - ADD, ADDI, SUB
 - AND, ANDI, OR, ORI, XOR, XORI
 - SLT, SLTI, SLTU, SLTIU
 - SLL, SLLI, SRL, SRLI, SRA, SRAI
 - LW, SW
-- BEQ
+- BEQ, BNE, BLT, BGE, BLTU, BGEU
 
 `rtl/rv32i_core.sv` connects the PC, decoder, register file, immediate generator,
-ALU, load/store interface, writeback selection, and BEQ path. Instruction and
+ALU, load/store interface, writeback selection, and branch comparison path. Instruction and
 data memories are **external Python models**, not synthesized RAM modules.
 The program tests fetch instruction words using the DUT's `current_pc`.
 
-The v0.2 decoder now selects XOR/XORI, unsigned comparisons, and register or
-immediate shifts. Immediate shifts qualify the upper immediate bits according
-to the RV32I encoding; ordinary I-type arithmetic continues to treat those
-bits as immediate data.
+The v0.2 decoder selects XOR/XORI, unsigned comparisons, and register or
+immediate shifts. The v0.3 decoder adds `branch_type` selection for BNE, BLT,
+BGE, BLTU, and BGEU. Immediate shifts qualify the upper immediate bits
+according to the RV32I encoding; ordinary I-type arithmetic continues to treat
+those bits as immediate data.
 Read the [specification](docs/specification.md),
 [datapath diagram](docs/datapath.md), and
 [control table](docs/control_table.md) for the precise boundary.
@@ -54,16 +56,16 @@ Do not recreate an existing working environment. Normal checks are:
 ```sh
 make env
 make lint-core
-make regression SEED=20260916
+make regression SEED=20260919
 ```
 
 `make regression` runs all seven test groups, reports case counts and failed
 targets, and returns a nonzero status on a detected failure. It must run from
 the repository root. `make test` alone still tests **only the full adder**.
 
-## Verified v0.2 results
+## Verified v0.3 results
 
-Full regression rerun on 2026-09-16:
+Full regression run on 2026-09-19:
 
 | Target | cocotb cases | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -73,16 +75,18 @@ Full regression rerun on 2026-09-16:
 | `test-pc` | 3 | 3 | 0 | 0 |
 | `test-immediate-generator` | 1 | 1 | 0 | 0 |
 | `test-decoder` | 1 | 1 | 0 | 0 |
-| `test-core` | 8 | 8 | 0 | 0 |
-| **Total** | **21** | **21** | **0** | **0** |
+| `test-core` | 11 | 11 | 0 | 0 |
+| **Total** | **24** | **24** | **0** | **0** |
 
 The process exited with status 0. These are test-case counts, not instruction
-counts or coverage percentages. Core simulation time was 386 ns; this is not
-an implementation-performance measurement.
+counts or coverage percentages. The current core target simulated for 781 ns;
+this is not an implementation-performance measurement.
 
-The eight core cases check arithmetic, reset write blocking, LW/SW, BEQ,
-PC-indexed straight-line execution, a zero-initialized loop/store/load
-program, XOR/unsigned comparisons, and the register/immediate shift group.
+The eleven core cases check arithmetic, reset write blocking, LW/SW, BEQ,
+BNE, signed BLT/BGE, unsigned BLTU/BGEU, PC-indexed straight-line execution,
+a zero-initialized loop/store/load program, XOR/unsigned comparisons, and the
+register/immediate shift group. The new branch cases check `rf_we=0` and
+`data_write_en=0`.
 The shift case includes shift amount 31 and a register shift source of 32 to
 verify RV32's low-five-bit rule; it also checks that these ALU instructions do
 not assert `data_write_en`. The straight-line program finishes with
@@ -93,12 +97,14 @@ The currently saved second program finishes with
 The initial-5 loop previously passed with sum 15, but that variant was replaced
 by initial 0 in the saved test. It is **historical evidence, not an additional
 case in today's regression**. Initial 1 was explicitly skipped by the owner
-and remains unverified. See the
+and remains unverified. The reverse-direction and equality boundaries for the
+four relational branches are also unverified; this is not exhaustive branch
+acceptance. See the
 [verification plan and evidence](docs/verification_plan.md).
 
 Each group refreshes its XML in `reports/`. The runner saves stdout and stderr
 to `reports/regression/<target>.log`, overwriting that target's previous log.
-All seven latest logs confirm supplied cocotb seed `20260916`.
+All seven latest logs confirm supplied cocotb seed `20260919`.
 The ALU's independent reference-vector generator uses fixed seed `20260906`;
 changing `SEED` does not change that generator.
 
@@ -131,18 +137,19 @@ No warning class was disabled. `-Wno-fatal` keeps warnings visible while
 allowing the command to complete; status 0 does not mean warning-free RTL.
 
 Generic Yosys synthesis and `check -assert` succeeded with 0 reported structural
-problems. The v0.2 hierarchy contains **5372 generic cells**, including
-1024 register-file enabled flip-flops, 32 PC flip-flops, and 151 decoder cells.
-No latch was inferred from the combinational processes. These are tool/run-specific structural
-counts, **not silicon area or Fmax**. No target technology library, STA,
-post-layout timing, or gate-level equivalence result is claimed.
+problems. The current v0.3 hierarchy contains **5456 generic cells**, including
+1024 register-file enabled flip-flops, 32 PC flip-flops, and 169 decoder cells.
+No latch was inferred from the combinational processes. These are tool/run-specific
+structural counts, **not silicon area or Fmax**. No target technology library,
+STA, post-layout timing, or gate-level equivalence result is claimed. The v0.2
+count of 5372 is historical and is not the v0.3 result.
 
 The [synthesis record](docs/synthesis.md) contains the exact command, hierarchy,
 warning disposition, and reproduction instructions. Generated evidence:
 
 - `reports/lint/day13-core.log`
-- `reports/synthesis/v0.2-core.log`
-- `build/synthesis/v0.2-rv32i_core.v` (generated netlist, not hand-written source)
+- `reports/synthesis/v0.3-core.log`
+- `build/synthesis/v0.3-rv32i_core.v` (generated netlist, not hand-written source)
 
 ## Repository map
 
@@ -158,8 +165,8 @@ warning disposition, and reproduction instructions. Generated evidence:
 
 ## Limitations and next session
 
-- Only the 22 listed instruction types are supported; no jump, upper-immediate,
-  subword memory, remaining branch, CSR, trap, interrupt, or privileged support.
+- Only the 27 listed instruction types are supported; no jump, upper-immediate,
+  subword memory, CSR, trap, interrupt, or privileged support.
 - Memory has no ready/valid protocol or variable latency; tests supply reads
   before the committing clock edge and model writes at the edge.
 - Tests use aligned instructions and word accesses. Alignment/access faults
@@ -172,11 +179,13 @@ warning disposition, and reproduction instructions. Generated evidence:
   exercised end-to-end. XML-reader failure/skipped counting was checked using
   a retained real failure report.
 
-Stop this session at **DAY15 / v0.2**. Start the next session with
-`PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before beginning
-v0.3 (branches) and v0.4
-(byte/halfword memory). Core RTL and primary verification logic remain the
-owner's work; auxiliary tooling is not a separate line-by-line course.
+This closeout stops at **DAY16 / v0.3**. Start the next session with
+`PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before planning
+v0.4 byte/halfword memory. First settle the byte-addressed little-endian
+contract, low-bit lane selection, write strobes, byte preservation,
+sign/zero extension, and alignment/access exceptions; only then change the
+core and Python memory model. Core RTL and primary verification logic remain
+the owner's work.
 
 ## References and attribution
 

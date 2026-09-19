@@ -1,20 +1,23 @@
 # P1 Development Progress
 
-Last updated: 2026-09-16
+Last updated: 2026-09-19
 
 ## Current Status
 
-**DAY15 / P1 v0.2 — technical and documentation checkpoint closed.**
+**DAY16 / P1 v0.3 — branch implementation checkpoint and
+documentation/Git closeout.**
 
-The 22-instruction single-cycle subset executes PC-indexed programs using
+The 27-instruction single-cycle subset executes PC-indexed programs using
 external Python instruction/data memories. The latest full regression passed
-21/21 cases across seven groups. Lint warnings were reviewed and generic Yosys
-synthesis passed. v0.3-v0.5 remain planned; no later-version RTL was added.
+24/24 cases across seven groups, and the core target passed 11/11. The v0.3
+branch implementation is present and its current tests pass, but relational
+branch coverage is not complete: the BLT/BGE and BLTU/BGEU reverse directions
+and equality boundaries remain unverified.
 
 The owner authorized a combined code/documentation commit and push for this
-v0.2 closeout. No Git tag or GitHub Release was requested. Use `git log`, remote
-verification, and the final closeout message for the resulting commit; this
-document does not equate a version label with a published release tag.
+v0.3 closeout. No Git tag or GitHub Release was requested. Use `git log`,
+remote verification, and the final closeout message for the resulting commit;
+this document does not equate a version label with a published release tag.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -489,6 +492,53 @@ explicitly unverified. There is still no byte/halfword memory, remaining branch
 group, U/J instruction, whole-core reference interpreter, formal proof, STA,
 physical area, or Fmax result.
 
+## DAY16 — P1 v0.3 Branch Extension
+
+Owner-written v0.3 changes are present in `rtl/decoder.sv`,
+`rtl/rv32i_core.sv`, `tb/test_decoder.py`, and `tb/test_beq.py`. The decoder
+adds `branch_type` codes `NONE=0`, `BEQ=1`, `BNE=2`, `BLT=3`, `BGE=4`,
+`BLTU=5`, and `BGEU=6`. The core selects equality, inequality, signed
+less-than, unsigned less-than, or the corresponding inverse and keeps branch
+register/memory writes inactive.
+
+The primary branch tests cover BNE equal/not-equal cases, signed `-1` versus
+`1` with BLT taken and BGE not-taken, and unsigned `0xffffffff` versus `1`
+with BLTU not-taken and BGEU taken. Each new branch case checks `rf_we=0`
+and `data_write_en=0`.
+
+Observed verification on 2026-09-19:
+
+- `make lint-core`: exit 0; one visible, accepted `UNUSEDSIGNAL` warning for
+  the I/S/B immediate generator's unused `instr[19:12,6:0]`.
+- `make test-core`: 11/11 cases passed, 0 failed, 0 skipped.
+- `make regression SEED=20260919`: seven groups, 24/24 cases passed, 0
+  failed, 0 skipped, exit status 0.
+- `tb/test_decoder.py`: one cocotb case with 29 decoder vectors.
+- The implemented subset is 27 instruction types, not 27 test cases.
+- The v0.3 synthesis reproduction passed with 5456 generic cells,
+  `check -assert` reporting 0 problems, and no inferred combinational latch.
+  This is generic structural evidence only; there is no STA, Fmax, physical
+  area, or gate-level equivalence result.
+
+Known v0.3 acceptance gap: BLT/BGE have not been tested with the opposite
+ordering that makes BGE taken and BLT not-taken; BLTU/BGEU have not been
+tested with the opposite ordering that makes BLTU taken and BGEU not-taken.
+Equality boundaries for all four relational branches are also unverified.
+The current passing regression must not be described as exhaustive branch
+acceptance.
+
+Intermediate review findings recorded for continuity were the `NOEN` spelling
+typo for the `NONE` branch code, a duplicated BEQ expected vector during
+decoder-vector editing, a trailing-comma/`NULLPORT` interface issue while
+adding the new port, and the need to complete the `branch_type` connection
+through decoder and core. These were corrected before the current lint,
+regression, and synthesis runs; no such current source error is claimed.
+
+The owner wrote the v0.3 core RTL and primary branch tests. This closeout
+records observed behavior and evidence boundaries; passing tools do not by
+themselves establish a complete independent explanation of every branch
+corner case.
+
 ## Current integration boundary and open work
 
 - Core instruction and data ports connect to external Python memory models.
@@ -499,38 +549,41 @@ physical area, or Fmax result.
   are not implemented/verified.
 - No byte/halfword addressing contract, jump/U/J support, bus handshake, trap,
   pipeline, STA, physical area, or Fmax claim.
+- The planned 2026-09-18 v2.0 target date has passed, but this repository is
+  still at v0.3. The schedule does not lower the verification standard or
+  turn this checkpoint into a v2.0 release.
 - Reports, netlists, and waves are ignored by Git; tracked documents preserve
   the commands and observed summaries. Future runs regenerate local evidence.
 
-## Next-session handoff — start v0.3, not DAY11
+## Next-session handoff — start v0.4, not v0.3
 
-DAY: DAY15 / v0.2 closeout.
+DAY: DAY16 / v0.3 implementation checkpoint and documentation/Git closeout.
 
-Completed: 22-instruction single-cycle core, XOR/unsigned-comparison and shift
-tests, one-command regression with logs and seed, reviewed lint, v0.2 generic
-synthesis, and checkpoint documentation.
+Completed: 27-instruction single-cycle core, v0.3 branch selection with
+signed/unsigned comparisons, owner-written directed branch cases, 24/24
+full-regression evidence, current lint, v0.3 generic synthesis, and updated
+checkpoint documents.
 
-Owner work demonstrated: decoder extension, primary cocotb expectations,
-shift-boundary testing, PC-indexed instruction driving, and memory-model
-corrections. The owner has not claimed an independent whole-core reference
-model, formal proof, STA, or physical PPA result.
+Owner work demonstrated: branch decoder extension, `branch_type` interface
+completion, signed versus unsigned comparison selection, no-side-effect
+expectations, PC-indexed instruction driving, and external memory-model
+behavior. The owner has not claimed an independent whole-core reference model,
+formal proof, exhaustive branch coverage, STA, or physical PPA result.
 
-Actual verification: 21/21 cases, seven groups, exit 0; core 8/8; reviewed
-lint warning; Yosys structural check 0 problems and 5372 generic cells. No
-initial-1, STA, or Fmax evidence.
+Still explicitly unverified: initial-1 loop behavior; the reverse and
+equality boundaries for BLT/BGE/BLTU/BGEU; exhaustive ISA/invalid-encoding
+coverage; and the full regression-runner error matrix. Initial 5 remains
+historical evidence only, while the current default loop uses initial 0.
 
-Actual v0.2 bug fixed: invalid immediate-shift `funct7` values were accepted;
-SLLI/SRLI/SRAI now require their legal upper encodings. The DAY11 `LogicArray`
-memory-model issue and earlier integration bugs remain recorded above and in
-`docs/bug_diary.md`.
+v0.4 remains a plan only. First define the byte-addressed little-endian
+contract, including low-address-bit lane selection, write strobes that preserve
+unwritten bytes, signed/zero extension, and the alignment/access-exception
+behavior. Only after that contract is agreed should the owner change
+`rtl/rv32i_core.sv` and the Python data-memory model and add the corresponding
+tests. The first file to revisit is `docs/specification.md`; the first RTL
+module after that contract is `rtl/rv32i_core.sv`.
 
-Next start: v0.3 branches — BNE, BLT, BGE, BLTU, and BGEU. First inspect
-`rtl/decoder.sv`, `rtl/rv32i_core.sv`, `tb/test_decoder.py`, and
-`tb/test_beq.py`; define signed/unsigned comparison and taken/not-taken
-expectations before changing branch RTL. Do not start v0.4 subword memory until
-the branch group has its directed and boundary tests and regression closeout.
-
-Read first: `PROJECT_PLAN.md`, `docs/specification.md`, this handoff, and the
-current RTL/tests. Preserve mentor mode; do not repeat completed exercises or
-turn auxiliary Python plumbing into the main learning task. Document edits and
-Git operations still follow the owner's explicit scope and authorization.
+Read first: `PROJECT_PLAN.md`, `README.md`, `docs/specification.md`, this
+handoff, and the current RTL/tests. Preserve mentor mode; do not repeat
+completed exercises or turn the v0.4 plan into implementation during the next
+handoff.

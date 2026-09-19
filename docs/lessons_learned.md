@@ -1,12 +1,14 @@
-# v0.2 Learning and Ownership Notes
+# v0.3 Learning and Ownership Notes
 
-Recorded at DAY15, 2026-09-16. These are topics practiced or explained, not a
+Recorded at DAY16, 2026-09-19. These are topics practiced or explained, not a
 claim that every topic has passed an independent oral assessment.
 
 ## Owner-written work
 
 - Component and integrated CPU RTL, reviewed incrementally.
 - Primary cocotb stimulus, expected results, and architectural assertions.
+- v0.3 decoder branch-type selection, core branch comparison logic, and
+  primary branch cases.
 - PC-indexed program execution and external Python memory behavior.
 - The regression runner, rebuilt incrementally after the owner rejected an
   earlier complete assistant-written version.
@@ -29,6 +31,12 @@ the owner; no existing third-party CPU implementation was imported.
   Supply load data before the consuming edge and sample settled signals.
 - BEQ targets the current PC plus its signed immediate. The core compares
   operands directly and suppresses register/memory write side effects.
+- `branch_type` separates BEQ/BNE from signed BLT/BGE and unsigned BLTU/BGEU.
+  `$signed` is required for the signed relation; the unsigned relation uses the
+  original 32-bit vectors. Greater-or-equal branches use the inverse of the
+  corresponding less-than result.
+- Passing one ordering for each relational pair does not prove the reverse
+  ordering or equality boundary. Those remain explicit v0.3 follow-up checks.
 - A successful simulation tests sampled behaviors; lint and synthesis examine
   different structural properties. None alone proves complete correctness.
 - A register array need not map to SRAM. The observed generic flow used
@@ -37,7 +45,7 @@ the owner; no existing third-party CPU implementation was imported.
   different quantities. Historical evidence must not be relabeled as current
   default regression coverage.
 
-## v0.2 instruction-group lessons
+## v0.3 instruction-group lessons
 
 - Signed `SLT/SLTI` and unsigned `SLTU/SLTIU` use different comparison
   interpretations even though both return only 0 or 1. `SLTIU` still receives
@@ -51,9 +59,10 @@ the owner; no existing third-party CPU implementation was imported.
 - `reg_write` controls the register-file write port. `data_write_en` is the
   external data-memory write signal used by SW; an ALU instruction should not
   assert the latter.
-- The new owner-written decoder test remains one cocotb case containing 22
-  vectors; instruction count, vector count, and cocotb case count remain
-  separate evidence categories.
+- The owner-written decoder test is one cocotb case containing 29 vectors; the
+  v0.3 core adds three branch cases and reaches 11 core cases. Instruction
+  count, vector count, and cocotb case count remain separate evidence
+  categories.
 
 ## Explicit remaining understanding checks
 
@@ -73,5 +82,7 @@ and important test logic. Explain Python through the owner's C background when
 needed. Auxiliary argument parsing, log formatting, and Git commands are not
 separate line-by-line assignments. Group related instructions, preserve actual
 verification, honor explicitly skipped cases, and start at the nearest unfinished
-feature. v0.3 branch implementation begins in the next conversation, not this
-closeout.
+feature. v0.4 begins in the next conversation with a memory contract first:
+little-endian byte lanes, write strobes and byte preservation, signed/zero
+extension, and alignment/access exceptions. Do not implement that feature from
+this closeout note alone.

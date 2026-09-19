@@ -9,7 +9,8 @@ module decoder (
     output logic       result_src,
     output logic       branch,
     output logic [1:0] imm_type,
-    output logic [3:0] alu_op
+    output logic [3:0] alu_op,
+    output logic [2:0] branch_type
 );
 
 localparam logic [6:0] R_TYPE = 7'b0110011;
@@ -33,14 +34,23 @@ localparam logic [1:0] IMM_I = 2'b00;
 localparam logic [1:0] IMM_S = 2'b01;
 localparam logic [1:0] IMM_B = 2'b10;
 
+localparam logic [2:0] NONE = 3'b000;
+localparam logic [2:0] BEQ  = 3'b001;
+localparam logic [2:0] BNE  = 3'b010;
+localparam logic [2:0] BLT  = 3'b011;
+localparam logic [2:0] BGE  = 3'b100;
+localparam logic [2:0] BLTU = 3'b101;
+localparam logic [2:0] BGEU = 3'b110;
+
 always_comb begin
-    reg_write  = 1'b0;
-    alu_src    = 1'b0;
-    mem_write  = 1'b0;
-    result_src = 1'b0;
-    branch     = 1'b0;
-    imm_type   = IMM_I;
-    alu_op     = ALU_ADD;
+    reg_write   = 1'b0;
+    alu_src     = 1'b0;
+    mem_write   = 1'b0;
+    result_src  = 1'b0;
+    branch      = 1'b0;
+    imm_type    = IMM_I;
+    alu_op      = ALU_ADD;
+    branch_type = NONE;
 
     case (opcode)
         R_TYPE: begin
@@ -179,6 +189,37 @@ always_comb begin
                 branch   = 1'b1;
                 imm_type = IMM_B;
                 alu_op   = ALU_SUB;
+                branch_type = BEQ;
+            end
+            if (funct3 == 3'b001) begin
+                branch   = 1'b1;
+                imm_type = IMM_B;
+                alu_op   = ALU_SUB;
+                branch_type = BNE;
+            end
+            if (funct3 == 3'b100) begin
+                branch   = 1'b1;
+                imm_type = IMM_B;
+                alu_op   = ALU_SUB;
+                branch_type = BLT;
+            end
+            if (funct3 == 3'b101) begin
+                branch   = 1'b1;
+                imm_type = IMM_B;
+                alu_op   = ALU_SUB;
+                branch_type = BGE;
+            end
+            if (funct3 == 3'b110) begin
+                branch   = 1'b1;
+                imm_type = IMM_B;
+                alu_op   = ALU_SUB;
+                branch_type = BLTU;
+            end
+            if (funct3 == 3'b111) begin
+                branch   = 1'b1;
+                imm_type = IMM_B;
+                alu_op   = ALU_SUB;
+                branch_type = BGEU;
             end
         end
 

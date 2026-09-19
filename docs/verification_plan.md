@@ -1,6 +1,6 @@
-# v0.2 Verification Plan and Evidence
+# v0.3 Verification Plan and Evidence
 
-Checkpoint: 2026-09-16. Results below are observed, not proposed coverage.
+Checkpoint: 2026-09-19. Results below are observed, not proposed coverage.
 
 ## Layers and responsibilities
 
@@ -22,7 +22,7 @@ functional/line/branch coverage measurement in this checkpoint.
 Executed from the repository root in WSL:
 
 ```sh
-make regression SEED=20260916
+make regression SEED=20260919
 ```
 
 | Target | Test source | XML under reports/ | Cases / pass / fail / skip |
@@ -33,13 +33,14 @@ make regression SEED=20260916
 | test-pc | test_pc.py | pc.xml | 3 / 3 / 0 / 0 |
 | test-immediate-generator | test_immediate_generator.py | immediate_generator.xml | 1 / 1 / 0 / 0 |
 | test-decoder | test_decoder.py | decoder.xml | 1 / 1 / 0 / 0 |
-| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 8 / 8 / 0 / 0 |
-| **Total** | | | **21 / 21 / 0 / 0** |
+| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 11 / 11 / 0 / 0 |
+| **Total** | | | **24 / 24 / 0 / 0** |
 
 Exit status: 0. Test count is distinct from vector count and instruction count.
 The ALU's 19 directed vectors and 2000 seeded vectors are grouped into two
 cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
-22 legal and boundary instruction vectors.
+29 legal and boundary instruction vectors. The implemented subset contains
+27 instruction types; these counts are not interchangeable.
 
 ## Core cases and architectural expectations
 
@@ -49,15 +50,19 @@ cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
 | test_reset_blocks_register_write | Existing x13 value survives an attempted write while reset forces PC=0 |
 | test_lw_sw | Store 42 at byte address 72 and load 42 into x3 |
 | test_beq | Taken +8, not taken, negative -12 branch; a taken BEQ's write enables are checked inactive |
+| test_bne | Equal operands not taken and unequal operands taken; both branch write enables inactive |
+| test_blt_bge | Signed -1 versus 1: BLT taken and BGE not-taken; both branch write enables inactive |
+| test_bltu_bgeu | Unsigned 0xffffffff versus 1: BLTU not-taken and BGEU taken; both branch write enables inactive |
 | test_program | Fetch at PC 0/4/8; final x3=12, PC=12 |
 | test_program2 | Current initial-0 program exits loop, stores/loads 0 at byte address 64, ends at PC=32 |
 | test_xor_sltu_instrs | XOR/XORI and SLTU/SLTIU results, including unsigned ordering and sign-extended immediate behavior |
 | test_shift_instrs | SLL/SLLI, SRL/SRLI, SRA/SRAI; shift amount 31, register source 32, final PC=52, and `data_write_en=0` |
 
-This exercises the 22 supported instruction types, but does not prove all their
+This exercises the 27 supported instruction types, but does not prove all their
 input combinations or all side effects under every condition. In particular,
 not every unsupported encoding, reset/memory interaction, or alignment case is
-tested. Current tests inspect internal register storage for some assertions;
+tested. The relational branch reverse directions and equality boundaries are
+not tested. Current tests inspect internal register storage for some assertions;
 that hierarchy is a test dependency, not a stable external hardware interface.
 
 ## Loop variants: current versus historical
@@ -65,7 +70,7 @@ that hierarchy is a test dependency, not a stable external hardware interface.
 | Initial counter | Evidence | Current default case? |
 | --- | --- | --- |
 | 5 | Historical DAY11 run: x1=0, x2=x3=memory[64]=15, PC=32; six-case report passed, 586 ns | No; later replaced by initial 0 |
-| 0 | Latest eight-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
+| 0 | Latest eleven-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
 | 1 | Explicitly skipped by the owner | No; unverified |
 
 Initial-5 historical XML: `reports/day11-program2-review2/core.xml`.
@@ -114,7 +119,7 @@ immutable run archive is generated. A failure opening a log or launching Make
 is not handled by the report-parsing exception handler.
 
 `--seed` is parsed by the runner and passed through the subprocess environment
-as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260916`.
+as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260919`.
 `random.Random(20260906)` in the ALU test is independently seeded. Reproduction
 also requires the same source, test selection, and compatible toolchain; the
 seed alone is not a complete environment record.
@@ -132,7 +137,7 @@ To focus on the currently saved zero-initialized program:
 make waves-core CORE_TEST_MODULES=test_program COCOTB_TEST_FILTER=test_program2
 ```
 
-These are reproduction instructions; DAY15 did not rerun the historical zero
+These are reproduction instructions; DAY16 did not rerun the historical zero
 waveform or open GTKWave. Automatic waveform generation on failure is not
 implemented. Wave targets share `dump.fst`; do not run them concurrently.
 
@@ -141,6 +146,9 @@ implemented. Wave targets share `dump.fst`; do not run them concurrently.
 For each agreed group: define semantics/encoding and hardware corner cases,
 let the owner implement RTL and principal tests, run directed and useful
 boundary tests, inspect any real failure, then rerun the existing regression.
-Only claim newly implemented instruction support after those tests execute.
-Formal verification, exhaustive coverage, and a whole-core reference model
-remain separate future decisions, not existing results.
+For v0.4, first define byte-addressed little-endian lane selection, write
+strobes and byte preservation, signed/zero extension, and alignment/access
+exceptions; only then change the core and Python memory model. Only claim
+newly implemented instruction support after those tests execute. Formal
+verification, exhaustive coverage, and a whole-core reference model remain
+separate future decisions, not existing results.

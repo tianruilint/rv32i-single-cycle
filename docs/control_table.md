@@ -1,12 +1,13 @@
-# v0.2 Decoder and Core Control Table
+# v0.3 Decoder and Core Control Table
 
-Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, DAY15 checkpoint, 2026-09-16.
+Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, DAY16 checkpoint, 2026-09-19.
 This table records current outputs, not a proposed replacement implementation.
 
 ## Encoding qualification
 
 All fields below are binary. R-type uses opcode `0110011`; I-type arithmetic
-uses `0010011`; LW uses `0000011`; SW uses `0100011`; BEQ uses `1100011`.
+uses `0010011`; LW uses `0000011`; SW uses `0100011`; the branch group uses
+`1100011`.
 
 | Instruction | Class | funct3 | funct7 qualification |
 | --- | --- | --- | --- |
@@ -32,6 +33,11 @@ uses `0010011`; LW uses `0000011`; SW uses `0100011`; BEQ uses `1100011`.
 | LW | load | `010` | Not checked |
 | SW | store | `010` | Not checked |
 | BEQ | branch | `000` | Not checked |
+| BNE | branch | `001` | Not checked |
+| BLT | branch | `100` | Not checked |
+| BGE | branch | `101` | Not checked |
+| BLTU | branch | `110` | Not checked |
+| BGEU | branch | `111` | Not checked |
 
 ## Decoder outputs
 
@@ -64,6 +70,11 @@ ALU operation codes here are internal, not ISA funct3 values.
 | LW | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
 | SW | 0 | 1 | 1 | 0 | 0 | S | ADD `0000` |
 | BEQ | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
+| BNE | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
+| BLT | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
+| BGE | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
+| BLTU | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
+| BGEU | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
 | Unsupported/invalid | 0 | 0 | 0 | 0 | 0 | I | ADD `0000` |
 
 All outputs receive defaults before the opcode case. Empty/default branches
@@ -74,14 +85,17 @@ retain these assignments, rather than retaining a previous instruction's state.
 - `rf_we` is `reg_write` gated off by reset. The register file separately rejects
   writes to destination x0.
 - `data_write_en` is `mem_write` gated off by reset.
-- `branch_taken` is `branch && (rs1_data == rs2_data)`; it feeds `take_target`.
+- `branch_type` uses `NONE=000`, `BEQ=001`, `BNE=010`, `BLT=011`, `BGE=100`,
+  `BLTU=101`, and `BGEU=110`. `branch_taken` is `branch` plus the selected
+  equality, signed-less-than, unsigned-less-than, or inverse comparison; it
+  feeds `take_target`.
 - PC reset takes priority over `take_target` inside `pc.sv`.
-- BEQ does not depend on the selected ALU SUB result for equality.
+- Branches do not depend on the selected ALU SUB result for the comparison.
 - Shift-immediate upper-field values are checked before enabling SLLI, SRLI, or
   SRAI. Invalid combinations have no register/memory write or branch side effect,
   but PC advances by four when not in reset. No illegal-instruction trap exists.
 
-The decoder unit test is one cocotb case containing 22 legal and boundary
+The decoder unit test is one cocotb case containing 29 legal and boundary
 vectors; it is not exhaustive. Valid OR/SLT and other architectural outcomes
 are also exercised by the integrated arithmetic chain;
 see [verification_plan.md](verification_plan.md) for the evidence boundary.

@@ -1,7 +1,8 @@
 # Bug Diary
 
-This diary records actual development failures, not hypothetical bugs or
-invented fault-injection evidence. Updated for DAY15 on 2026-09-16.
+This diary records actual development failures and intermediate review findings,
+not hypothetical bugs or invented fault-injection evidence. Updated for DAY16
+on 2026-09-19.
 
 ## DAY11 — Simulator value used as a Python dictionary key
 
@@ -48,6 +49,28 @@ there without manufacturing missing failure logs or waveform measurements.
   immediates are the deliberate constrained exception.
 
 ## Template for future real issues
+
+## DAY16 — v0.3 branch-extension review findings
+
+These were intermediate issues found and corrected during the owner-written
+branch extension. They are retained as development history; the current
+working files passed lint, regression, and synthesis.
+
+- A temporary `NOEN` spelling typo was corrected to `NONE` for the default
+  branch type.
+- A BEQ expected tuple was temporarily duplicated while extending the decoder
+  vector list. The current list has one BEQ vector and 29 total vectors.
+- A trailing-comma/`NULLPORT` interface issue appeared while adding the new
+  decoder output. The `branch_type` port is now declared and connected through
+  the decoder/core interface; current Verilator and Yosys runs report no such
+  source error.
+- The core branch selector was completed only after the decoder `branch_type`
+  signal was wired into the core. The final path selects equality, signed
+  less-than, unsigned less-than, or the inverse relation.
+
+Coverage boundary, not a resolved bug: the current directed tests do not cover
+the reverse ordering or equality boundary for BLT/BGE/BLTU/BGEU. Initial-1
+program behavior remains explicitly waived by the owner.
 
 Copy this template when a new issue is actually encountered.
 

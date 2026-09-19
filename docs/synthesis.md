@@ -80,7 +80,9 @@ Verilator 5.050 returned status 0 and one visible `UNUSEDSIGNAL` warning at
 this module. I/S/B immediate extraction uses other fields, so the warning is
 accepted for this scope. Other core modules still use those instruction bits.
 
-The original output is retained in `reports/lint/day13-core.log`.
+The v0.3 command was rerun on 2026-09-19 with the same result. The historical
+v0.2/day13 output remains in `reports/lint/day13-core.log`; no separate
+current-lint artifact is required for this closeout.
 `-Wno-fatal` permits completion with warnings; no warning class was hidden.
 Revisit this disposition if immediate formats or interfaces change.
 
@@ -127,3 +129,30 @@ and 32 flip-flops, respectively. The full hierarchy has 0 memory objects;
 inferred latch. These are generic structural observations only. No
 technology-specific area, Fmax, slack, STA, placement, routing, or gate-level
 equivalence claim is made.
+
+## v0.3 rerun
+
+Reproduced on 2026-09-19 with the same WSL Ubuntu-24.04 toolchain after the
+branch decoder/core extension. The command was:
+
+`yosys -Q -T -l reports/synthesis/v0.3-core.log -p 'read_verilog -sv rtl/rv32i_core.sv rtl/pc.sv rtl/decoder.sv rtl/register_file.sv rtl/immediate_generator.sv rtl/alu.sv; synth -top rv32i_core; check -assert; stat; write_verilog -noattr build/synthesis/v0.3-rv32i_core.v'`
+
+The command exited 0. The generated log and netlist are ignored artifacts at
+`reports/synthesis/v0.3-core.log` and `build/synthesis/v0.3-rv32i_core.v`.
+
+| Scope | Cells |
+| --- | ---: |
+| alu | 1429 |
+| decoder | 169 |
+| immediate_generator | 78 |
+| pc | 143 |
+| register_file | 3167 |
+| rv32i_core, direct contents | 475, including five child instances |
+| **Full hierarchy, primitive total** | **5456** |
+
+The v0.3 hierarchy has 1024 register-file enabled flip-flops, 32 PC
+flip-flops, 0 memory objects, and 2394 MUX cells. The structural check reports
+0 problems, and Yosys reports no inferred latch for the combinational decoder,
+branch selector, immediate, ALU, or next-PC processes. These are generic
+structural observations only. They do not establish technology-specific area,
+Fmax, slack, STA, placement, routing, or gate-level equivalence.

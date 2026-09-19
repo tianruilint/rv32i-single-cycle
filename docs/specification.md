@@ -1,7 +1,7 @@
-# P1 v0.2 Implemented Processor Specification
+# P1 v0.3 Implemented Processor Specification
 
-Checkpoint: DAY15, 2026-09-16. This document specifies the implemented subset,
-not the complete RV32I ISA or the future v0.3+ design.
+Checkpoint: DAY16, 2026-09-19. This document specifies the implemented subset,
+not the complete RV32I ISA or the future v0.4+ design.
 
 ## Scope
 
@@ -11,7 +11,7 @@ input and a separate external data-memory interface. The synthesized top is
 `immediate_generator`, and `alu`.
 
 Instruction and data memories are supplied by cocotb/Python. No RTL instruction
-ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.2.
+ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.3.
 Automated tests check register values, memory values, PC, and selected control
 signals. They do not establish complete ISA compliance.
 
@@ -50,7 +50,7 @@ write enable.
   memory writes are blocked while reset is high.
 - Otherwise, one instruction commits per rising edge, assuming the environment
   has supplied stable instruction and load data. There is no latency handshake.
-- Default next PC is `current_pc + 4`. A taken BEQ selects
+- Default next PC is `current_pc + 4`. A taken branch selects
   `current_pc + sign_extended_B_immediate`, not `PC+4+immediate`.
 - Reset has priority over branch selection. Arithmetic and address results wrap
   modulo 2^32; no arithmetic-overflow exception is generated.
@@ -77,8 +77,13 @@ write enable.
 | LW | `rd = external_word[rs1 + Iimm]` |
 | SW | `external_word[rs1 + Simm] = rs2` |
 | BEQ | If rs1 equals rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| BNE | If rs1 does not equal rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| BLT | If signed rs1 is less than signed rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| BGE | If signed rs1 is greater than or equal to signed rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| BLTU | If unsigned rs1 is less than unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| BGEU | If unsigned rs1 is greater than or equal to unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 
-These grouped rows describe 22 instruction types. All register-writing
+These grouped rows describe 27 instruction types. All register-writing
 operations obey x0 behavior. BEQ has no register or memory write side effects.
 Supported non-branch instructions advance PC by four. ANDI and ORI also use
 sign extension, not zero extension.
@@ -104,11 +109,21 @@ the core can capture it in the register file. An uninitialized dictionary read
 is not defined to return zero; the current program initializes its load address
 with SW first.
 
-v0.2 verification assumes 4-byte-aligned instructions, branch destinations,
+v0.3 verification assumes 4-byte-aligned instructions, branch destinations,
 and LW/SW addresses. RTL does not detect or trap misalignment or access faults.
 B-immediate reconstruction fixes bit 0 to zero but does not enforce bit 1.
 No byte-addressable storage layout or endianness test exists yet; v0.4 must
 define that contract before adding subword accesses.
+
+## Branch controls
+
+The decoder outputs `branch_type` with project-local codes:
+`NONE=000`, `BEQ=001`, `BNE=010`, `BLT=011`, `BGE=100`, `BLTU=101`, and
+`BGEU=110`. The core computes equality, signed less-than, and unsigned
+less-than explicitly, then selects or inverts the relevant result. `branch`
+must be active before any branch type can take the target. All supported
+branches leave register-file and external data-memory write enables inactive.
+The core does not use an ALU zero flag as the branch decision.
 
 ## Internal controls
 
@@ -119,7 +134,7 @@ returns zero. U/J formats are not implemented.
 
 The core uses ALU ADD=`0000`, SUB=`0001`, AND=`0010`, OR=`0011`, XOR=`0100`,
 SLL=`0101`, SRL=`0110`, SRA=`0111`, SLT=`1000`, and SLTU=`1001`. See
-[control_table.md](control_table.md) for all v0.2 controls and encoding
+[control_table.md](control_table.md) for all v0.3 controls and encoding
 qualification rules.
 
 Unsupported opcodes or invalid combinations for the supported instruction
@@ -135,7 +150,6 @@ shift-immediate forms are the deliberate exception described above.
 
 ## Unsupported features and deferred work
 
-- BNE/BLT/BGE/BLTU/BGEU (v0.3).
 - LB/LBU/LH/LHU/SB/SH and byte-write masks (v0.4).
 - LUI/AUIPC/JAL/JALR and U/J immediates (v0.5).
 - FENCE, ECALL, EBREAK, CSR/privileged/trap/interrupt machinery.
@@ -148,12 +162,17 @@ silently extending this implemented specification.
 
 ## Validation boundary
 
-The 2026-09-16 v0.2 regression passed 21/21 cocotb cases across seven groups,
-including eight core cases. The saved program tests exercise a straight-line
-sum and the initial-zero exit/store/load path. The initial-5 loop has historical
-passing evidence; initial 1 remains intentionally unverified.
+The 2026-09-19 v0.3 regression passed 24/24 cocotb cases across seven groups,
+including 11 core cases. The decoder test is one case with 29 vectors. The
+implemented subset is 27 instruction types. Branch tests cover BNE equality
+and inequality, one signed BLT/BGE ordering, and one unsigned BLTU/BGEU
+ordering, with branch write enables checked inactive.
 
-Generic synthesis passed with no inferred combinational latch and 0 problems
-from `check -assert`. Neither this nor the directed regression proves all
-possible executions correct. See [verification_plan.md](verification_plan.md)
-and [synthesis.md](synthesis.md) for exact evidence and open coverage gaps.
+The reverse-direction and equality boundaries for BLT/BGE/BLTU/BGEU remain
+unverified. Initial 5 is historical evidence, initial 0 is the current saved
+program, and initial 1 remains intentionally unverified. Generic v0.3
+synthesis passed with no inferred combinational latch and 0 problems from
+`check -assert`, with 5456 generic cells. Neither this nor the directed
+regression proves all possible executions correct. See
+[verification_plan.md](verification_plan.md) and [synthesis.md](synthesis.md)
+for exact evidence and open coverage gaps.

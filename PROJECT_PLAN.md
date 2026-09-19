@@ -6,23 +6,32 @@
 >
 > Every Codex session MUST read this file before modifying the project.
 
-## Current checkpoint and session boundary — 2026-09-16
+## Current checkpoint and session boundary — 2026-09-19
 
-**DAY15 / P1 v0.2 is closed.** The next session starts v0.3. Do not implement
-v0.3, v0.4, or later features during this v0.2 documentation/Git closeout.
+**DAY16 / P1 v0.3 is the current branch implementation checkpoint.** The
+documentation and Git closeout is authorized; do not implement v0.4 during
+this session.
 
-- Implemented: the 22-instruction single-cycle subset, PC-indexed Python
-  instruction memory, external Python data memory, and program-level tests.
-- Latest full regression: seven groups, 21/21 cocotb cases, 0 failed/skipped,
+- Implemented: the 27-instruction single-cycle subset, PC-indexed Python
+  instruction memory, external Python data memory, program-level tests, and
+  BNE/BLT/BGE/BLTU/BGEU branch selection.
+- Latest full regression: seven groups, 24/24 cocotb cases, 0 failed/skipped,
   exit status 0; seed forwarding and seven per-target logs verified.
+- Core target: 11/11 cases passed. The decoder test remains one case with 29
+  vectors.
 - Lint: one reviewed immediate-generator `UNUSEDSIGNAL` warning, no error.
-- Generic Yosys synthesis: 5372 generic cells, no inferred combinational latch,
-  `check -assert` reports 0 problems. No technology-specific area or STA claim.
+- v0.3 generic Yosys synthesis: 5456 generic cells, no inferred combinational
+  latch, `check -assert` reports 0 problems. No technology-specific area or
+  STA claim.
 - Current saved loop test uses initial 0. Initial 5 passed historically but is
   not retained as a separate default case. Initial 1 remains explicitly skipped.
+- Relational branch reverse-direction and equality boundaries remain
+  unverified; the passing regression is not exhaustive branch acceptance.
 - DAY12 assembler-to-image automation is deferred, not completed. Automatic
   failure-wave generation was optional and is not implemented.
-- v0.2 is a local technical/documentation checkpoint. Commit/push are separately
+- The planned 2026-09-18 v2.0 target date has passed; the repository remains
+  at v0.3 and the verification standard is not lowered.
+- v0.3 is a local technical/documentation checkpoint. Commit/push are
   authorized for this closeout; no Git tag or GitHub Release is requested.
 
 Authority order: latest explicit owner instruction, latest agreed milestone
@@ -1390,35 +1399,36 @@ At this point P1 becomes a legitimate project artifact.
 
 ---
 
-# 22. Post-DAY15 — P1 v1.0 Development
+# 22. Post-DAY16 — P1 v1.0 Development
 
-After v0.2 is stable:
+After v0.3 is stable enough to hand off its documented verification gaps:
 
 Expand instruction support systematically.
 
-The following v0.2-v0.5 names label the Phase A-D work; v0.2 is now closed and
-the remaining entries are intermediate checkpoints on the path to v1.0.
+The following v0.2-v0.5 names label the Phase A-D work. They are intermediate
+checkpoints on the path to v1.0, not release tags.
 
 | Milestone | Scope | Main owner-written work |
 | --- | --- | --- |
 | v0.2 / Phase A | XOR/XORI, shifts, SLTU/SLTIU | Decoder extension, shift-encoding qualification, instruction tests; **closed 2026-09-16** |
-| v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests |
+| v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests; **implementation checkpoint 2026-09-19, reverse/equality gaps remain** |
 | v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests |
 | v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests |
 | v1.0 | Stable expanded single-cycle CPU | Verification gaps, RTL fixes, reproducible synthesis and basic STA |
 | v2.0 | Five-stage pipeline, after the v1.0 stability gate | Pipeline registers, forwarding, hazards, stall/bubble/flush, tests |
 
-### Next-session starting task: v0.3
+### Next-session starting task: v0.4 planning and contract
 
-1. Read the v0.2 handoff in `PROGRESS.md` and confirm the checkout/remote state.
-2. Inspect `rtl/decoder.sv`, `rtl/rv32i_core.sv`, `tb/test_decoder.py`, and
-   `tb/test_beq.py`; run the baseline regression if RTL/tests changed.
-3. Define and implement BNE, BLT, BGE, BLTU, and BGEU with explicit signed or
-   unsigned comparison behavior.
-4. Add taken, not-taken, positive-offset, negative-offset, and no-side-effect
-   branch tests before changing the stage boundary.
-5. Do not start subword memory until the branch group has its directed/boundary
-   tests and regression closed.
+1. Read the v0.3 handoff in `PROGRESS.md`, confirm the checkout/remote state,
+   and keep the recorded relational-branch gaps visible.
+2. Start in `docs/specification.md`: decide the byte-addressed little-endian
+   contract, including low-address-bit lane selection and how word addresses
+   map to byte lanes.
+3. Define write strobes and the rule for preserving bytes not selected by
+   SB/SH; define signed versus zero extension for LB/LBU/LH/LHU.
+4. Decide the alignment/access-exception behavior before changing RTL.
+5. Only then update `rtl/rv32i_core.sv`, the Python data-memory model, and
+   directed tests. Do not silently implement v0.4 during this closeout.
 
 The owner knows C and is learning Python as a verification tool. Group related
 instructions to keep progress fast. Do not repeat completed DAY11 exercises,
@@ -1619,8 +1629,8 @@ test logic. Direct RTL/test replacement requires an explicit request. Document
 updates, Git commits, pushes, tags, and releases each require applicable owner
 authorization. Do not treat a request to run tests as permission to change them.
 
-For this DAY15 closeout, documentation updates and a combined commit/push are
-authorized; v0.3+ implementation and release-tag creation are not.
+For this DAY16 closeout, documentation updates and a combined commit/push are
+authorized; v0.4+ implementation and release-tag creation are not.
 
 ---
 

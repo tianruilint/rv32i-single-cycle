@@ -1,13 +1,12 @@
-# v0.2 Single-cycle Datapath
+# v0.3 Single-cycle Datapath
 
-Implemented checkpoint: DAY15, 2026-09-16. Source top: `rtl/rv32i_core.sv`.
+Implemented checkpoint: DAY16, 2026-09-19. Source top: `rtl/rv32i_core.sv`.
 The boxes inside the core are synthesizable logic. Both memory models below
 are cocotb/Python testbench components, not RTL RAMs.
 
-The v0.2 datapath keeps the v0.1 single-cycle structure. The decoder now
-selects XOR, unsigned comparison, and register/immediate shift operations;
-branches, subword memory, jumps, and pipeline registers remain outside this
-checkpoint.
+The v0.3 datapath keeps the v0.1 single-cycle structure. The decoder selects
+XOR, unsigned comparison, register/immediate shifts, and six branch types;
+subword memory, jumps, and pipeline registers remain outside this checkpoint.
 
 ```mermaid
 flowchart LR
@@ -21,7 +20,7 @@ flowchart LR
         BMUX["ALU operand-B MUX"]
         ALU["alu"]
         WB["writeback MUX"]
-        EQ["rs1 == rs2 and branch control"]
+        CMP["equality, signed/unsigned compare, branch selection"]
         TARGET["current_pc + imm"]
     end
     PC -->|current_pc| IM
@@ -33,13 +32,13 @@ flowchart LR
     DEC -->|alu_op| ALU
     DEC -->|result_src| WB
     DEC -->|register write, gated by reset| RF
-    DEC -->|branch| EQ
+    DEC -->|branch + branch_type| CMP
     DEC -->|memory write, gated by reset| DM
     RF -->|rs1_data| ALU
     RF -->|rs2_data| BMUX
     IMM -->|imm| BMUX
     BMUX -->|alu_b| ALU
-    RF -->|rs1_data and rs2_data| EQ
+    RF -->|rs1_data and rs2_data| CMP
     RF -->|data_write_data| DM
     ALU -->|data_addr| DM
     ALU -->|alu_result| WB
@@ -48,7 +47,7 @@ flowchart LR
     PC -->|current_pc| TARGET
     IMM -->|imm| TARGET
     TARGET -->|target_pc| PC
-    EQ -->|take_target| PC
+    CMP -->|take_target| PC
 ```
 
 PC's sequential alternative is `current_pc + 4`; reset overrides both choices
@@ -71,14 +70,16 @@ This is an event sequence through one single-cycle datapath, not pipeline stages
 
 ## Branch path
 
-BEQ uses an explicit rs1/rs2 equality comparison in the core. Although the
-decoder selects ALU SUB for BEQ, the branch decision does not consume an ALU
-zero flag. The target adder uses the **current branch PC** plus the B immediate.
-Neither register-file nor memory writes are enabled by BEQ.
+The core computes equality, signed less-than, and unsigned less-than directly.
+`branch_type` selects BEQ, BNE, BLT, BGE, BLTU, or BGEU, with inverse
+selection for the greater-or-equal forms. Although the decoder selects ALU SUB
+for branches, the branch decision does not consume an ALU zero flag. The target
+adder uses the **current branch PC** plus the B immediate. No supported branch
+enables register-file or external data-memory writes.
 
 ## Why an array becomes flip-flops and MUXes
 
-`register_file.sv` declares 32 words of 32 bits. The v0.2 generic synthesis
+`register_file.sv` declares 32 words of 32 bits. The v0.3 generic synthesis
 reported 1024 enabled single-bit flip-flops and 1984 MUXes in this module.
 Two independent read addresses require two data-selection networks. A binary
 32-to-1 selection tree has 31 two-input MUXes per bit; `31 * 32 * 2 = 1984`
@@ -96,4 +97,6 @@ Addresses changing at a read port propagate through combinational selection;
 reads do not wait for a clock edge. Writes do. The overall load path may include
 register read, ALU address generation, external memory, and writeback. That is
 a candidate path to analyze later, not a measured critical path. See
-[synthesis.md](synthesis.md) for what has and has not been measured.
+[synthesis.md](synthesis.md) for what has and has not been measured. The
+current v0.3 hierarchy reports 5456 generic cells; the earlier v0.2 count of
+5372 is historical and is not a v0.3 result.
