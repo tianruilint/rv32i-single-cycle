@@ -1,7 +1,7 @@
-# P1 v0.4 Implemented Processor Specification
+# P1 v0.5 Implemented Processor Specification
 
-Checkpoint: DAY17, 2026-09-20. This document specifies the implemented subset,
-not the complete RV32I ISA or the future v0.5+ design.
+Checkpoint: DAY18, 2026-09-21. This document specifies the implemented subset,
+not the complete RV32I ISA or the future v1.0+ design.
 
 ## Scope
 
@@ -11,7 +11,7 @@ input and a separate external data-memory interface. The synthesized top is
 `immediate_generator`, and `alu`.
 
 Instruction and data memories are supplied by cocotb/Python. No RTL instruction
-ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.4.
+ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.5.
 Automated tests check register values, memory values, PC, and selected control
 signals. They do not establish complete ISA compliance.
 
@@ -53,14 +53,17 @@ a memory operation without the relevant instruction or write enable.
   has supplied stable instruction and load data. There is no latency handshake.
 - Default next PC is `current_pc + 4`. A taken branch selects
   `current_pc + sign_extended_B_immediate`, not `PC+4+immediate`.
-- Reset has priority over branch selection. Arithmetic and address results wrap
-  modulo 2^32; no arithmetic-overflow exception is generated.
+- JAL selects `current_pc + sign_extended_J_immediate`. JALR selects
+  `(rs1 + sign_extended_I_immediate) & 32'hfffffffe`.
+- Reset has priority over branch/jump selection. Arithmetic and address results
+  wrap modulo 2^32; no arithmetic-overflow exception is generated.
 - The tests' 10 ns clock is a simulation stimulus setting, not a measured
   achievable clock period.
 
 ## Supported instruction semantics
 
-`Iimm`, `Simm`, and `Bimm` below are sign-extended 32-bit immediates.
+`Iimm`, `Simm`, `Bimm`, and `Jimm` below are sign-extended 32-bit immediates.
+`Uimm` is `instr[31:12]` followed by twelve zero bits.
 
 | Instruction | Implemented architectural action |
 | --- | --- |
@@ -89,10 +92,16 @@ a memory operation without the relevant instruction or write enable.
 | BGE | If signed rs1 is greater than or equal to signed rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 | BLTU | If unsigned rs1 is less than unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 | BGEU | If unsigned rs1 is greater than or equal to unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
+| LUI | `rd = Uimm` |
+| AUIPC | `rd = current_pc + Uimm` |
+| JAL | `rd = current_pc + 4`; next PC is `current_pc + Jimm` |
+| JALR | For `funct3=000`, `rd = current_pc + 4`; next PC is `(rs1 + Iimm) & ~1` |
 
-These grouped rows describe 33 instruction types. All register-writing
+These grouped rows describe 37 instruction types. All register-writing
 operations obey x0 behavior. Branches have no register or memory write side
-effects. Supported non-branch instructions advance PC by four. The load
+effects. Jumps write only their link destination and do not write memory;
+instructions skipped by the jump do not commit. Other supported non-branch
+instructions advance PC by four. The load
 extension rules are signed for LB/LH and zero-filled for LBU/LHU. ANDI and ORI
 also use sign extension, not zero extension.
 
@@ -126,7 +135,7 @@ selected lane, SH places `rs2[15:0]` in lanes 0/1 or 2/3, and SW uses all four
 lanes. Strobe bit 0 corresponds to the lowest-address byte, so the supported
 patterns are SB `0001/0010/0100/1000`, SH `0011/1100`, and SW `1111`.
 
-Alignment limits are part of the v0.4 contract: LB/LBU/SB may use any byte
+Alignment limits are part of the v0.5 contract: LB/LBU/SB may use any byte
 address; LH/LHU/SH require `data_addr[0] == 0`; and LW/SW require
 `data_addr[1:0] == 2'b00`. Misaligned halfword/word accesses may span two
 aligned words. The current one-word external interface does not assemble or
@@ -149,16 +158,38 @@ must be active before any branch type can take the target. All supported
 branches leave register-file and external data-memory write enables inactive.
 The core does not use an ALU zero flag as the branch decision.
 
+## Upper-immediate and jump controls
+
+LUI writes the U immediate directly. AUIPC selects `current_pc` as ALU operand
+A and the U immediate as operand B, then writes the ALU sum. JAL and JALR select
+`PC+4` as writeback data. `jump_type=01` selects the JAL target
+`current_pc+imm`; `jump_type=10` selects the JALR target from the ALU sum with
+bit 0 cleared. Both jump types assert `take_target` independently of the branch
+comparison path.
+
+JALR is accepted only when `funct3=000`. Its instruction bits [31:20] are the
+I immediate, so the decoder does not qualify `funct7`. JAL has no funct3 or
+funct7 qualification because those bit positions belong to its immediate.
+The current instruction model uses four-byte-aligned addresses. JALR bit 0
+clearing is implemented and tested, but a resulting target with bit 1 set does
+not raise an instruction-address-misaligned exception and is unsupported and
+unverified.
+
 ## Internal controls
 
-The immediate generator and decoder use I=`00`, S=`01`, B=`10`.
+The immediate generator and decoder use I=`000`, S=`001`, B=`010`, U=`011`,
+and J=`100`.
 These are project-local encodings, not ISA instruction encodings. The generator
 provides an output on every combinational path; an unsupported `imm_type`
-returns zero. U/J formats are not implemented.
+returns zero.
+
+The two-bit writeback selection is ALU=`00`, load data=`01`, U immediate=`10`,
+and `PC+4`=`11`. `alu_a_pc=1` selects current PC rather than rs1 for the ALU-A
+input. `jump_type` is none=`00`, JAL=`01`, and JALR=`10`.
 
 The core uses ALU ADD=`0000`, SUB=`0001`, AND=`0010`, OR=`0011`, XOR=`0100`,
 SLL=`0101`, SRL=`0110`, SRA=`0111`, SLT=`1000`, and SLTU=`1001`. See
-[control_table.md](control_table.md) for all v0.4 controls and encoding
+[control_table.md](control_table.md) for all v0.5 controls and encoding
 qualification rules.
 
 Unsupported opcodes or invalid combinations for the supported instruction
@@ -176,7 +207,8 @@ shift-immediate forms are the deliberate exception described above.
 
 - Misaligned halfword/word accesses that require two aligned external words;
   no split/assemble path or misalignment trap exists.
-- LUI/AUIPC/JAL/JALR and U/J immediates (v0.5).
+- Instruction-address-misaligned targets and the corresponding exception;
+  targets with bit 1 set are unsupported/unverified.
 - FENCE, ECALL, EBREAK, CSR/privileged/trap/interrupt machinery.
 - Variable-latency memories, buses, caches, MMU, and pipeline hazards.
 - Assembly-to-image automation, whole-core ISA reference interpreter, formal
@@ -187,9 +219,10 @@ silently extending this implemented specification.
 
 ## Validation boundary
 
-The 2026-09-20 v0.4 regression passed 26/26 cocotb cases across seven groups,
-including 13 core cases. The decoder test is one case with 37 vectors. The
-implemented subset is 33 instruction types; the current harness does not report
+The 2026-09-21 v0.5 regression passed 28/28 cocotb cases across seven groups,
+including 15 core cases. The immediate-generator and decoder tests are one
+case each with 13 and 42 vectors. The implemented subset is 37 instruction
+types; the current harness does not report
 a dynamic-instruction execution count. Branch tests cover BNE equality and
 inequality, one signed BLT/BGE ordering, and one unsigned BLTU/BGEU ordering,
 with branch write enables checked inactive. Subword tests cover aligned lane
@@ -199,9 +232,12 @@ selected by a store.
 The reverse-direction and equality boundaries for BLT/BGE/BLTU/BGEU remain
 unverified. Initial 5 is historical evidence, initial 0 is the current saved
 program, and initial 1 remains intentionally unverified. Misaligned
-halfword/word accesses are unsupported and unverified. Generic v0.4 synthesis
+halfword/word accesses are unsupported and unverified. Generic v0.5 synthesis
 passed with no inferred combinational latch and 0 problems from `check -assert`,
-with 6142 generic cells. Neither this nor the directed
+with 6642 generic cells. The upper-immediate case verifies LUI/AUIPC results;
+the jump case verifies JAL/JALR link addresses, JALR bit-0 clearing, the PC path,
+and no effects from two skipped instructions. Negative integrated JAL behavior
+and targets with bit 1 set remain unverified. Neither this nor the directed
 regression proves all possible executions correct. See
 [verification_plan.md](verification_plan.md) and [synthesis.md](synthesis.md)
 for exact evidence and open coverage gaps.

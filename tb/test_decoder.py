@@ -162,3 +162,47 @@ async def test_decoder(dut):
             f"funct3={funct3:03b}, funct7={funct7:07b}: "
             f"expected={expected}, actual={actual}"
         )
+
+
+    v05_vectors = [
+        (0x37, 0b000, 0b0000000,
+        (1, 0, 0, 2, 0, 3, ALU_ADD, NONE, 0, 0)),
+
+        (0x17, 0b000, 0b0000000,
+        (1, 1, 0, 0, 0, 3, ALU_ADD, NONE, 1, 0)),
+
+        (0x6F, 0b000, 0b0000000,
+        (1, 0, 0, 3, 0, 4, ALU_ADD, NONE, 0, 1)),
+
+        (0x67, 0b000, 0b1010101,
+        (1, 1, 0, 3, 0, 0, ALU_ADD, NONE, 0, 2)),
+
+        (0x67, 0b001, 0b0000000,
+        (0, 0, 0, 0, 0, 0, ALU_ADD, NONE, 0, 0)),
+    ]
+
+    for opcode, funct3, funct7, expected in v05_vectors:
+        dut.opcode.value = opcode;
+        dut.funct3.value = funct3;
+        dut.funct7.value = funct7;
+
+        await Timer(1, unit="ns")
+
+        actual = (
+            int(dut.reg_write.value),
+            int(dut.alu_src.value),
+            int(dut.mem_write.value),
+            int(dut.result_src.value),
+            int(dut.branch.value),
+            int(dut.imm_type.value),
+            int(dut.alu_op.value),
+            int(dut.branch_type.value),
+            int(dut.alu_a_pc.value),
+            int(dut.jump_type.value)
+        )
+
+        assert actual == expected, (
+            f"opcode=0x{opcode:02X}, "
+            f"funct3={funct3:03b}, funct7={funct7:07b}: "
+            f"expected={expected}, actual={actual}"
+        )

@@ -6,21 +6,23 @@
 >
 > Every Codex session MUST read this file before modifying the project.
 
-## Current checkpoint and session boundary — 2026-09-20
+## Current checkpoint and session boundary — 2026-09-21
 
-**DAY17 / P1 v0.4 is the current byte/halfword memory implementation
-checkpoint.** Documentation and Git closeout are authorized; v0.4 RTL/test
-changes are owner-written and frozen for this closeout.
+**DAY18 / P1 v0.5 is the completed U-type and jump implementation
+checkpoint.** Documentation plus a combined commit/push are authorized;
+v0.5 RTL/test changes are owner-written and frozen for this closeout.
 
-- Implemented: the 33-instruction single-cycle subset, PC-indexed Python
+- Implemented: the 37-instruction single-cycle subset, PC-indexed Python
   instruction memory, external Python data memory, program-level tests,
-  BNE/BLT/BGE/BLTU/BGEU branch selection, and LB/LBU/LH/LHU/SB/SH.
-- Latest full regression: seven groups, 26/26 cocotb cases, 0 failed/skipped,
+  BNE/BLT/BGE/BLTU/BGEU, LB/LBU/LH/LHU/SB/SH, and
+  LUI/AUIPC/JAL/JALR.
+- Latest full regression: seven groups, 28/28 cocotb cases, 0 failed/skipped,
   exit status 0; seed forwarding and seven per-target logs verified.
-- Core target: 13/13 cases passed. The decoder test is one case with 37
-  vectors. The testbench does not report a dynamic-instruction count.
+- Core target: 15/15 cases passed. Immediate and decoder tests are one case
+  each with 13 and 42 vectors. The testbench does not report a dynamic-
+  instruction count.
 - Lint: one reviewed immediate-generator `UNUSEDSIGNAL` warning, no error.
-- v0.4 generic Yosys synthesis: 6142 generic cells, no inferred combinational
+- v0.5 generic Yosys synthesis: 6642 generic cells, no inferred combinational
   latch, `check -assert` reports 0 problems, and 0 memory objects remain. No
   technology-specific area or STA claim.
 - Current saved loop test uses initial 0. Initial 5 passed historically but is
@@ -29,12 +31,15 @@ changes are owner-written and frozen for this closeout.
   unverified; the passing regression is not exhaustive branch acceptance.
 - Misaligned halfword/word accesses that would span two aligned words are
   unsupported and unverified; no misalignment or access-fault exception exists.
+- JALR target bit 0 clearing is verified. The instruction model assumes
+  four-byte-aligned PCs; targets with bit 1 set and instruction-address-
+  misalignment exceptions are unsupported/unverified.
 - DAY12 assembler-to-image automation is deferred, not completed. Automatic
   failure-wave generation was optional and is not implemented.
 - The planned 2026-09-18 v2.0 target date has passed; the repository remains
   below v1.0 and the verification standard is not lowered.
-- v0.4 is a local technical/documentation checkpoint. Commit/push are
-  authorized for this closeout; no Git tag or GitHub Release is requested.
+- v0.5 is a technical/documentation checkpoint. Commit/push are authorized
+  for this closeout; no Git tag or GitHub Release is requested.
 
 Authority order: latest explicit owner instruction, latest agreed milestone
 scope, this plan, then older chat/history. `docs/specification.md` describes
@@ -1401,11 +1406,12 @@ At this point P1 becomes a legitimate project artifact.
 
 ---
 
-# 22. Post-DAY17 — P1 v1.0 Development
+# 22. Post-DAY18 — P1 v1.0 Development
 
-After v0.4 is stable enough to hand off its documented verification gaps:
+After v0.5 is stable enough to hand off its documented verification gaps:
 
-Expand instruction support systematically.
+Stabilize the implemented single-cycle subset systematically. Add any further
+instruction scope only after it is explicitly defined and accepted.
 
 The following v0.2-v0.5 names label the Phase A-D work. They are intermediate
 checkpoints on the path to v1.0, not release tags.
@@ -1415,20 +1421,22 @@ checkpoints on the path to v1.0, not release tags.
 | v0.2 / Phase A | XOR/XORI, shifts, SLTU/SLTIU | Decoder extension, shift-encoding qualification, instruction tests; **closed 2026-09-16** |
 | v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests; **implementation checkpoint 2026-09-19, reverse/equality gaps remain** |
 | v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests; **closed 2026-09-20, misaligned halfword/word accesses remain unsupported/unverified** |
-| v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests |
+| v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests; **closed 2026-09-21, instruction-target alignment exceptions remain unsupported/unverified** |
 | v1.0 | Stable expanded single-cycle CPU | Verification gaps, RTL fixes, reproducible synthesis and basic STA |
 | v2.0 | Five-stage pipeline, after the v1.0 stability gate | Pipeline registers, forwarding, hazards, stall/bubble/flush, tests |
 
-### Next-session starting task: v0.5 planning and contract
+### Next-session starting task: v1.0 stabilization audit
 
-1. Read the v0.4 handoff in `PROGRESS.md`, confirm the checkout/remote state,
-   and keep the recorded relational-branch gaps, initial-1 waiver, and v0.4
-   misalignment boundary visible.
-2. Start in `docs/specification.md`: define U/J immediate semantics and the
-   PC and writeback behavior for LUI, AUIPC, JAL, and JALR.
-3. Decide jump alignment and link-address behavior before changing RTL.
-4. Only then update `rtl/rv32i_core.sv`, the decoder/immediate path, and
-   directed tests. Do not silently expand v0.4 during this closeout.
+1. Read the v0.5 handoff in `PROGRESS.md`, confirm the checkout/remote state,
+   and keep the recorded relational-branch gaps, initial-1 waiver, data-access
+   alignment boundary, and instruction-target alignment boundary visible.
+2. Audit the 37-instruction list against decoder/core controls, specification,
+   and the existing directed tests before adding new RTL.
+3. Prioritize high-value correctness gaps and reproducible engineering
+   evidence. Do not silently restore the waived initial-1 case or claim
+   exhaustive ISA coverage.
+4. Define a real basic timing-analysis setup before reporting timing. Generic
+   Yosys cell counts and the cocotb clock are not area or Fmax evidence.
 
 The owner knows C and is learning Python as a verification tool. Group related
 instructions to keep progress fast. Do not repeat completed DAY11 exercises,
@@ -1629,8 +1637,9 @@ test logic. Direct RTL/test replacement requires an explicit request. Document
 updates, Git commits, pushes, tags, and releases each require applicable owner
 authorization. Do not treat a request to run tests as permission to change them.
 
-For this DAY17 closeout, documentation updates and a combined commit/push are
-authorized; v0.5+ implementation and release-tag creation are not.
+For this DAY18 closeout, documentation updates and a combined commit/push are
+authorized; v1.0 implementation beyond the documented closeout and release-tag
+creation are not.
 
 ---
 

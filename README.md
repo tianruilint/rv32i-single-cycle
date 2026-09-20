@@ -3,15 +3,15 @@
 An owner-written educational 32-bit single-cycle CPU with automated
 SystemVerilog/Verilator/cocotb verification.
 
-**Current checkpoint: DAY17 / P1 v0.4 implementation checkpoint,
-documented on 2026-09-20.**
+**Current checkpoint: DAY18 / P1 v0.5 completed and verified,
+documented on 2026-09-21.**
 This is a verified **RV32I-subset** core, not a complete RV32I implementation.
 Version names identify development milestones; no Git tag or GitHub Release is
 implied.
 
 ## Implemented scope
 
-The integrated core supports these **33 instruction types**:
+The integrated core supports these **37 instruction types**:
 
 - ADD, ADDI, SUB
 - AND, ANDI, OR, ORI, XOR, XORI
@@ -20,6 +20,7 @@ The integrated core supports these **33 instruction types**:
 - LB, LBU, LH, LHU, LW
 - SB, SH, SW
 - BEQ, BNE, BLT, BGE, BLTU, BGEU
+- LUI, AUIPC, JAL, JALR
 
 `rtl/rv32i_core.sv` connects the PC, decoder, register file, immediate generator,
 ALU, load/store interface, writeback selection, and branch comparison path. Instruction and
@@ -32,6 +33,11 @@ BGE, BLTU, and BGEU. The v0.4 decoder adds the byte/halfword load/store
 encodings. Immediate shifts qualify the upper immediate bits according to the
 RV32I encoding; ordinary I-type arithmetic continues to treat those bits as
 immediate data.
+
+The v0.5 path adds U- and J-type immediate generation, PC as an optional ALU
+operand, `PC+4` link writeback, and direct/indirect jump target selection. JAL
+uses `current_pc + Jimm`; JALR uses `(rs1 + Iimm) & ~1`. Instructions skipped
+by a jump do not commit register or memory side effects in the directed test.
 
 The data interface uses a full 32-bit byte address and an aligned 32-bit
 little-endian `data_read_data` word supplied by the external Python model.
@@ -66,16 +72,16 @@ Do not recreate an existing working environment. Normal checks are:
 ```sh
 make env
 make lint-core
-make regression SEED=20260920
+make regression SEED=20260921
 ```
 
 `make regression` runs all seven test groups, reports case counts and failed
 targets, and returns a nonzero status on a detected failure. It must run from
 the repository root. `make test` alone still tests **only the full adder**.
 
-## Verified v0.4 results
+## Verified v0.5 results
 
-Full regression run on 2026-09-20:
+Full regression run on 2026-09-21:
 
 | Target | cocotb cases | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -85,19 +91,20 @@ Full regression run on 2026-09-20:
 | `test-pc` | 3 | 3 | 0 | 0 |
 | `test-immediate-generator` | 1 | 1 | 0 | 0 |
 | `test-decoder` | 1 | 1 | 0 | 0 |
-| `test-core` | 13 | 13 | 0 | 0 |
-| **Total** | **26** | **26** | **0** | **0** |
+| `test-core` | 15 | 15 | 0 | 0 |
+| **Total** | **28** | **28** | **0** | **0** |
 
 The process exited with status 0. These are cocotb test-case counts, not
 instruction-type counts, decoder-vector counts, dynamic-instruction counts, or
 coverage percentages. Any simulator time printed for the core target is a
 simulation detail, not an implementation-performance measurement.
 
-The thirteen core cases check arithmetic, reset write blocking, LW/SW, the
+The fifteen core cases check arithmetic, reset write blocking, LW/SW, the
 subword load/store sequence, byte and halfword lane boundaries, BEQ, BNE,
 signed BLT/BGE, unsigned BLTU/BGEU, PC-indexed straight-line execution, a
 zero-initialized loop/store/load program, XOR/unsigned comparisons, and the
-register/immediate shift group. The branch cases check `rf_we=0` and
+register/immediate shift group, LUI/AUIPC, and JAL/JALR control flow. The
+branch cases check `rf_we=0` and
 `data_write_en=0`; the subword cases also check `data_write_strb=0` for loads,
 lane-aligned write data, and byte preservation.
 The shift case includes shift amount 31 and a register shift source of 32 to
@@ -107,10 +114,18 @@ not assert `data_write_en`. The straight-line program finishes with
 The currently saved second program finishes with
 `x1=x2=x3=memory[64]=0`, `PC=32`.
 
-The decoder test is one cocotb case containing 37 legal and boundary vectors.
-The integrated subset contains 33 instruction types. The current testbench and
+The upper-immediate case checks LUI at PC 0 and AUIPC at PC 4, producing
+`x1=0xabcde000` and `x2=0x12345004`. The jump case observes the PC path
+`0 -> 4 -> 8 -> 16 -> 20 -> 40 -> 44`, checks JAL/JALR link values
+`x1=12` and `x3=24`, verifies JALR clears an odd target's bit 0, and confirms
+the skipped instructions leave their destination registers unchanged.
+
+The immediate-generator test is one cocotb case containing 13 vectors. The
+decoder test is one cocotb case containing 42 legal and boundary vectors.
+The integrated subset contains 37 instruction types. The current testbench and
 regression runner do not instrument or report a dynamic-instruction execution
-count; none is inferred from the 26 cocotb cases or 37 vectors.
+count; none is inferred from the 28 cocotb cases, 13 immediate vectors, or 42
+decoder vectors.
 
 The initial-5 loop previously passed with sum 15, but that variant was replaced
 by initial 0 in the saved test. It is **historical evidence, not an additional
@@ -122,7 +137,7 @@ acceptance. See the
 
 Each group refreshes its XML in `reports/`. The runner saves stdout and stderr
 to `reports/regression/<target>.log`, overwriting that target's previous log.
-All seven latest logs confirm supplied cocotb seed `20260920`.
+All seven latest logs confirm supplied cocotb seed `20260921`.
 The ALU's independent reference-vector generator uses fixed seed `20260906`;
 changing `SEED` does not change that generator.
 
@@ -151,24 +166,26 @@ The retained DAY11 initial-zero trace is
 ## Lint, synthesis, and timing boundary
 
 `make lint-core` exits successfully with one reviewed `UNUSEDSIGNAL` warning:
-the I/S/B immediate generator does not consume `instr[19:12,6:0]`.
+the I/S/B/U/J immediate generator does not consume opcode bits `instr[6:0]`.
 No warning class was disabled. `-Wno-fatal` keeps warnings visible while
 allowing the command to complete; status 0 does not mean warning-free RTL.
 
 Generic Yosys synthesis and `check -assert` succeeded with 0 reported structural
-problems. The current v0.4 hierarchy contains **6142 generic cells**, including
-1024 register-file enabled flip-flops, 32 PC flip-flops, and 172 decoder cells;
+problems. The current v0.5 hierarchy contains **6642 generic cells**, including
+1024 register-file enabled flip-flops, 32 PC flip-flops, 206 decoder cells, and
+216 immediate-generator cells;
 0 memory objects and 0 combinational latches were observed. These are
 tool/run-specific structural counts, **not silicon area or Fmax**. No target
 technology library, STA, post-layout timing, or gate-level equivalence result is
-claimed. The v0.3 count of 5456 and v0.2 count of 5372 are historical.
+claimed. The v0.4 count of 6142, v0.3 count of 5456, and v0.2 count of 5372
+are historical.
 
 The [synthesis record](docs/synthesis.md) contains the exact command, hierarchy,
 warning disposition, and reproduction instructions. Generated evidence:
 
 - `reports/lint/day13-core.log`
-- `reports/synthesis/v0.4-core.log`
-- `build/synthesis/v0.4-rv32i_core.v` (generated netlist, not hand-written source)
+- `reports/synthesis/v0.5-core.log`
+- `build/synthesis/v0.5-rv32i_core.v` (generated netlist, not hand-written source)
 
 ## Repository map
 
@@ -178,14 +195,14 @@ warning disposition, and reproduction instructions. Generated evidence:
 | `tb/` | cocotb component, instruction, and program tests |
 | `scripts/run_regression.py` | Test scheduling, XML statistics, logs, seed forwarding |
 | `docs/` | Implemented specification, architecture, verification, and debug evidence |
-| `PROJECT_PLAN.md` | Scope, mentor rules, and staged v0.3+ plan |
+| `PROJECT_PLAN.md` | Scope, mentor rules, and staged v1.0+ plan |
 | `PROGRESS.md` | Historical results and next-session handoff |
 | `build/`, `reports/`, `waves/` | Reproducible generated artifacts, ignored by Git |
 
 ## Limitations and next session
 
-- Only the 33 listed instruction types are supported; no jump, upper-immediate,
-  CSR, trap, interrupt, or privileged support.
+- Only the 37 listed instruction types are supported; there is no FENCE,
+  system/CSR, trap, interrupt, or privileged support.
 - Memory has no ready/valid protocol or variable latency; tests supply reads
   before the committing clock edge and model writes at the edge.
 - Byte accesses may use any byte address. Halfword accesses are supported only
@@ -200,12 +217,16 @@ warning disposition, and reproduction instructions. Generated evidence:
 - Runner failure/exception paths have been reviewed, but have not all been
   exercised end-to-end. XML-reader failure/skipped counting was checked using
   a retained real failure report.
+- JALR target bit 0 clearing is verified. Instruction-address misalignment
+  exceptions are not implemented; targets with bit 1 set are unsupported and
+  unverified under the current four-byte-aligned instruction-memory contract.
 
-This closeout stops at **DAY17 / v0.4**. Start the next session with
+This closeout completes **DAY18 / v0.5**. Start the next session with
 `PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before planning
-v0.5 U/J and jump support. Preserve the documented v0.3 branch gaps, initial-1
-waiver, and v0.4 misalignment boundary. Core RTL and primary verification logic
-remain the owner's work.
+the v1.0 stabilization pass. Preserve the documented v0.3 branch gaps,
+initial-1 waiver, v0.4 data-alignment boundary, and v0.5 instruction-target
+alignment boundary. Core RTL and primary verification logic remain the owner's
+work.
 
 ## References and attribution
 

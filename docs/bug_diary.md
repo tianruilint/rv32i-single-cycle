@@ -1,8 +1,8 @@
 # Bug Diary
 
 This diary records actual development failures and intermediate review findings,
-not hypothetical bugs or invented fault-injection evidence. Updated for DAY17
-on 2026-09-20.
+not hypothetical bugs or invented fault-injection evidence. Updated for DAY18
+on 2026-09-21.
 
 ## DAY11 — Simulator value used as a Python dictionary key
 
@@ -19,7 +19,7 @@ on 2026-09-20.
   clock edge and applies SW using the captured address/data/enable.
 - **Validation:** the initial-5 program subsequently passed with sum 15; the
   retained report `reports/day11-program2-review2/core.xml` has six passing
-  cases. The saved initial-0 variant also passes in the latest 21-case regression.
+  cases. The saved initial-0 variant also passes in the latest 28-case regression.
 - **Waveform boundary:** the retained, inspected waveform belongs to the later
   initial-zero run; no failing-waveform observation is asserted for this error.
 - **Lesson:** a DUT value handle/LogicArray is not a Python integer, and a value
@@ -48,8 +48,6 @@ there without manufacturing missing failure logs or waveform measurements.
   relevant instruction format. Ordinary I-type upper bits are data; shift
   immediates are the deliberate constrained exception.
 
-## Template for future real issues
-
 ## DAY16 — v0.3 branch-extension review findings
 
 These were intermediate issues found and corrected during the owner-written
@@ -59,7 +57,8 @@ working files passed lint, regression, and synthesis.
 - A temporary `NOEN` spelling typo was corrected to `NONE` for the default
   branch type.
 - A BEQ expected tuple was temporarily duplicated while extending the decoder
-  vector list. The current list has one BEQ vector and 29 total vectors.
+  vector list. The v0.3 checkpoint had 29 total vectors; the current v0.5 list
+  has one BEQ vector and 42 total vectors.
 - A trailing-comma/`NULLPORT` interface issue appeared while adding the new
   decoder output. The `branch_type` port is now declared and connected through
   the decoder/core interface; current Verilator and Yosys runs report no such
@@ -89,6 +88,37 @@ program behavior remains explicitly waived by the owner.
 - **Lesson:** every cocotb case that can run independently must own its clock,
   reset, inputs, and architectural preconditions. A simulator shutdown can
   otherwise create misleading zero-time follow-on failures.
+
+## DAY18 — v0.5 U/J and jump review findings
+
+These intermediate issues were found and corrected while reviewing the
+owner-written v0.5 implementation. The final source passes lint, component/core
+tests, the 28-case regression, and generic synthesis.
+
+- U/J immediate work initially contained syntax/concatenation issues. The
+  corrected J immediate is sign-extended and ordered as
+  `{{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0}`; component
+  vectors cover positive fields, a negative `-4` value, and the invalid-type
+  default.
+- The decoder draft temporarily duplicated the LUI path where JALR was needed,
+  selected the wrong immediate type for JALR, and accepted JALR without its
+  required `funct3=000` qualification. The corrected decoder uses I immediate
+  and leaves invalid JALR funct3 values at safe defaults.
+- Core integration review found an unpacked `pc_plus_4` declaration, incorrect
+  repeated writeback-select cases, a reversed ALU-A choice, and an incomplete
+  jump combinational case. The corrected path uses packed 32-bit `pc_plus_4`,
+  four distinct writeback choices, PC only when `alu_a_pc=1`, and complete
+  defaults so no latch is inferred.
+- The jump test initially recorded the terminal sentinel PC as an executed
+  instruction. Moving the stop check before appending the PC made `visited`
+  represent only fetched/executed instructions.
+
+The final directed path is `0 -> 4 -> 8 -> 16 -> 20 -> 40 -> 44`; it checks
+both link values, JALR bit-0 clearing, and that skipped writes do not occur.
+Target bit 1/misalignment behavior remains an explicit coverage and feature
+boundary, not a resolved bug.
+
+## Template for future real issues
 
 Copy this template when a new issue is actually encountered.
 

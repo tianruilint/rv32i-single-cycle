@@ -17,9 +17,9 @@ logic [6:0]  funct7;
 logic        reg_write_dec;
 logic        alu_src;
 logic        mem_write;
-logic        result_src;
+logic [1:0]  result_src;
 logic        branch;
-logic [1:0]  imm_type;
+logic [2:0]  imm_type;
 logic [3:0]  alu_op;
 logic        rf_we;
 logic [4:0]  rs1_addr;
@@ -41,6 +41,10 @@ logic        lt_unsigned;
 logic [31:0] load_data;
 logic [7:0]  selected_byte;
 logic [15:0] selected_half;
+logic        alu_a_pc;
+logic [1:0]  jump_type;
+logic [31:0] alu_a;
+logic [31:0] pc_plus_4;
 
 assign opcode = instr[6:0];
 assign funct3 = instr[14:12];
@@ -50,7 +54,17 @@ assign rs1_addr = instr[19:15];
 assign rs2_addr = instr[24:20];
 assign rd_addr = instr[11:7];
 assign alu_b = (alu_src) ? imm : rs2_data;
-assign wb_data = (result_src) ? load_data : alu_result;
+
+always_comb begin
+    case (result_src)
+        2'b00: wb_data = alu_result;
+        2'b01: wb_data = load_data;
+        2'b10: wb_data = imm;
+        2'b11: wb_data = pc_plus_4;
+        default: wb_data = alu_result;
+    endcase
+end
+
 assign data_addr = alu_result;
 always_comb begin
     data_write_data = 32'b0;
@@ -136,8 +150,15 @@ always_comb begin
         endcase
     end
 end
-assign take_target = branch_taken;
-assign target_pc = current_pc + imm;
+assign take_target = branch_taken | (jump_type == 2'b01) | (jump_type == 2'b10);
+always_comb begin
+    case (jump_type)
+        2'b00: target_pc = current_pc + imm;
+        2'b01: target_pc = current_pc + imm;
+        2'b10: target_pc = {alu_result[31:1], 1'b0};
+        default: target_pc = current_pc + imm;
+    endcase
+end
 always_comb begin
     case (alu_result[1:0])
         2'b00: selected_byte = data_read_data[7:0];
@@ -164,6 +185,12 @@ always_comb begin
         default: load_data = 32'b0;
     endcase
 end
+assign pc_plus_4 = current_pc + 4;
+assign alu_a = (alu_a_pc) ? current_pc : rs1_data;
+
+
+
+
 
 pc u_pc (
     .clk        (clk),
@@ -184,7 +211,9 @@ decoder u_decoder (
     .branch     (branch),
     .imm_type   (imm_type),
     .alu_op     (alu_op),
-    .branch_type(branch_type_dec)
+    .branch_type(branch_type_dec),
+    .alu_a_pc   (alu_a_pc),
+    .jump_type  (jump_type)
 );
 
 register_file u_register_file (
@@ -205,7 +234,7 @@ immediate_generator u_immediate_generator (
 );
 
 alu u_alu (
-    .a          (rs1_data),
+    .a          (alu_a),
     .b          (alu_b),
     .alu_op     (alu_op),
     .result     (alu_result)

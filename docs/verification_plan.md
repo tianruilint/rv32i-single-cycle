@@ -1,6 +1,6 @@
-# v0.4 Verification Plan and Evidence
+# v0.5 Verification Plan and Evidence
 
-Checkpoint: 2026-09-20. Results below are observed, not proposed coverage.
+Checkpoint: 2026-09-21. Results below are observed, not proposed coverage.
 
 ## Layers and responsibilities
 
@@ -22,7 +22,7 @@ functional/line/branch coverage measurement in this checkpoint.
 Executed from the repository root in WSL:
 
 ```sh
-make regression SEED=20260920
+make regression SEED=20260921
 ```
 
 | Target | Test source | XML under reports/ | Cases / pass / fail / skip |
@@ -33,21 +33,24 @@ make regression SEED=20260920
 | test-pc | test_pc.py | pc.xml | 3 / 3 / 0 / 0 |
 | test-immediate-generator | test_immediate_generator.py | immediate_generator.xml | 1 / 1 / 0 / 0 |
 | test-decoder | test_decoder.py | decoder.xml | 1 / 1 / 0 / 0 |
-| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 13 / 13 / 0 / 0 |
-| **Total** | | | **26 / 26 / 0 / 0** |
+| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 15 / 15 / 0 / 0 |
+| **Total** | | | **28 / 28 / 0 / 0** |
 
 Exit status: 0. Test count is distinct from vector count, instruction-type
 count, and dynamic-instruction count.
 The ALU's 19 directed vectors and 2000 seeded vectors are grouped into two
-cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
-37 legal and boundary instruction vectors. The implemented subset contains
-33 instruction types. The current testbench and regression runner do not
+cocotb cases, not 2019 cases. The immediate-generator test is one case with
+13 vectors. The decoder test is one cocotb case containing 42 legal and
+boundary instruction vectors. The implemented subset contains 37 instruction
+types. The current testbench and regression runner do not
 instrument or report a dynamic-instruction execution count; no dynamic total
 is inferred from the case or vector counts.
 
 `Makefile` keeps `CORE_TEST_MODULES := test_core,test_lw_sw,test_beq,test_program`;
 the two new subword cases are discovered through the existing `test_lw_sw`
 module, so no redundant regression entry was added.
+The two v0.5 core cases are in the existing `test_core.py` module and therefore
+also require no Makefile module-list change.
 
 ## Core cases and architectural expectations
 
@@ -66,12 +69,18 @@ module, so no redundant regression entry was added.
 | test_program2 | Current initial-0 program exits loop, stores/loads 0 at byte address 64, ends at PC=32 |
 | test_xor_sltu_instrs | XOR/XORI and SLTU/SLTIU results, including unsigned ordering and sign-extended immediate behavior |
 | test_shift_instrs | SLL/SLLI, SRL/SRLI, SRA/SRAI; shift amount 31, register source 32, final PC=52, and `data_write_en=0` |
+| test_upper_immediate_instrs | LUI at PC 0 and AUIPC at PC 4; expected x1/x2 values and no memory-write side effect |
+| test_jal_jalr_control_flow | PC path `0,4,8,16,20,40`, JAL/JALR links, odd-target bit-0 clearing, skipped destinations unchanged, and no memory write |
 
-This exercises the 33 supported instruction types, but does not prove all their
+This exercises the 37 supported instruction types, but does not prove all their
 input combinations or all side effects under every condition. In particular,
 not every unsupported encoding, reset/memory interaction, or misaligned
 halfword/word access is tested. The relational branch reverse directions and
-equality boundaries are not tested. Current tests inspect internal register
+equality boundaries are not tested. The integrated jump test uses one positive
+JAL offset and one forward JALR target. A negative J immediate is checked at
+the component level, but a negative taken JAL, target bit 1 behavior, and an
+instruction-address-misalignment exception are not integrated/verified.
+Current tests inspect internal register
 storage for some assertions; that hierarchy is a test dependency, not a stable
 external hardware interface.
 
@@ -80,7 +89,7 @@ external hardware interface.
 | Initial counter | Evidence | Current default case? |
 | --- | --- | --- |
 | 5 | Historical DAY11 run: x1=0, x2=x3=memory[64]=15, PC=32; six-case report passed, 586 ns | No; later replaced by initial 0 |
-| 0 | Latest eleven-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
+| 0 | Latest fifteen-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
 | 1 | Explicitly skipped by the owner | No; unverified |
 
 Initial-5 historical XML: `reports/day11-program2-review2/core.xml`.
@@ -139,7 +148,7 @@ immutable run archive is generated. A failure opening a log or launching Make
 is not handled by the report-parsing exception handler.
 
 `--seed` is parsed by the runner and passed through the subprocess environment
-as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260920`.
+as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260921`.
 `random.Random(20260906)` in the ALU test is independently seeded. Reproduction
 also requires the same source, test selection, and compatible toolchain; the
 seed alone is not a complete environment record.
@@ -157,18 +166,20 @@ To focus on the currently saved zero-initialized program:
 make waves-core CORE_TEST_MODULES=test_program COCOTB_TEST_FILTER=test_program2
 ```
 
-These are reproduction instructions; DAY16 did not rerun the historical zero
-waveform or open GTKWave. Automatic waveform generation on failure is not
-implemented. Wave targets share `dump.fst`; do not run them concurrently.
+These are reproduction instructions; the v0.5 closeout did not rerun the
+historical zero waveform or open GTKWave. Automatic waveform generation on
+failure is not implemented. Wave targets share `dump.fst`; do not run them
+concurrently.
 
 ## Acceptance for subsequent instruction groups
 
 For each agreed group: define semantics/encoding and hardware corner cases,
 let the owner implement RTL and principal tests, run directed and useful
 boundary tests, inspect any real failure, then rerun the existing regression.
-The v0.4 memory contract is now implemented and tested at its supported
-alignment boundaries. Only claim newly implemented instruction support after
-those tests execute. Formal verification, exhaustive coverage, a dynamic
+The v0.4 memory contract and v0.5 upper-immediate/jump contract are implemented
+and tested at their documented boundaries. Only claim newly implemented
+instruction support after those tests execute. Formal verification, exhaustive coverage, a dynamic
 instruction counter, and a whole-core reference model remain separate future
-decisions, not existing results. The next milestone is v0.5 U/J and jump
-planning.
+decisions, not existing results. The next milestone is v1.0 stabilization,
+including review of remaining correctness gaps and a real basic timing-analysis
+setup.

@@ -1,13 +1,13 @@
-# v0.4 Single-cycle Datapath
+# v0.5 Single-cycle Datapath
 
-Implemented checkpoint: DAY17, 2026-09-20. Source top: `rtl/rv32i_core.sv`.
+Implemented checkpoint: DAY18, 2026-09-21. Source top: `rtl/rv32i_core.sv`.
 The boxes inside the core are synthesizable logic. Both memory models below
 are cocotb/Python testbench components, not RTL RAMs.
 
-The v0.4 datapath keeps the v0.1 single-cycle structure. The decoder selects
+The v0.5 datapath keeps the v0.1 single-cycle structure. The decoder selects
 XOR, unsigned comparison, register/immediate shifts, six branch types, and the
-byte/halfword load/store group. Jumps and pipeline registers remain outside
-this checkpoint.
+byte/halfword load/store group, plus LUI/AUIPC/JAL/JALR. Pipeline registers
+remain outside this checkpoint.
 
 ```mermaid
 flowchart LR
@@ -17,26 +17,32 @@ flowchart LR
         PC["PC register and next-PC selection"]
         DEC["decoder"]
         RF["register_file: 2 reads, 1 clocked write"]
-        IMM["I/S/B immediate_generator"]
+        IMM["I/S/B/U/J immediate_generator"]
+        AMUX["ALU operand-A MUX: rs1 or current_pc"]
         BMUX["ALU operand-B MUX"]
         ALU["alu"]
-        WB["writeback MUX"]
+        WB["writeback MUX: ALU, load, Uimm, or PC+4"]
         LANE["byte/halfword lane select and sign/zero extension"]
         CMP["equality, signed/unsigned compare, branch selection"]
-        TARGET["current_pc + imm"]
+        TARGET["current_pc + branch/J immediate"]
+        LINK["current_pc + 4"]
+        NEXT["branch/JAL/JALR target selection"]
     end
     PC -->|current_pc| IM
     IM -->|instr fields| DEC
     IM -->|rs1 / rs2 / rd addresses| RF
     IM -->|instr| IMM
     DEC -->|imm_type| IMM
+    DEC -->|alu_a_pc| AMUX
     DEC -->|alu_src| BMUX
     DEC -->|alu_op| ALU
     DEC -->|result_src| WB
     DEC -->|register write, gated by reset| RF
     DEC -->|branch + branch_type| CMP
     DEC -->|memory write, gated by reset| DM
-    RF -->|rs1_data| ALU
+    RF -->|rs1_data| AMUX
+    PC -->|current_pc| AMUX
+    AMUX -->|alu_a| ALU
     RF -->|rs2_data| BMUX
     IMM -->|imm| BMUX
     BMUX -->|alu_b| ALU
@@ -46,16 +52,22 @@ flowchart LR
     DEC -->|funct3| LANE
     ALU -->|data_addr and low bits| LANE
     ALU -->|alu_result| WB
+    IMM -->|U immediate| WB
+    PC -->|current_pc| LINK
+    LINK -->|PC+4 link| WB
     DM -->|aligned data_read_data| LANE
     LANE -->|load_data| WB
     WB -->|rd_data at rising edge| RF
     PC -->|current_pc| TARGET
     IMM -->|imm| TARGET
-    TARGET -->|target_pc| PC
-    CMP -->|take_target| PC
+    TARGET -->|branch/JAL target| NEXT
+    ALU -->|JALR sum, bit 0 cleared| NEXT
+    CMP -->|branch decision| NEXT
+    DEC -->|jump_type| NEXT
+    NEXT -->|take_target and target_pc| PC
 ```
 
-PC's sequential alternative is `current_pc + 4`; reset overrides both choices
+PC's sequential alternative is `current_pc + 4`; reset overrides all choices
 and sets PC to 0 at a rising edge. The register file has no reset. The diagram
 omits the shared clock wiring and individual reset-gating gates for readability.
 
@@ -63,9 +75,10 @@ omits the shared clock wiring and individual reset-gating gates for readability.
 
 1. The testbench reads `current_pc` and supplies the instruction word.
 2. Instruction fields select register addresses and decoder controls. The
-   immediate generator assembles the selected I/S/B immediate.
-3. Register reads and operand selection settle combinationally. The ALU computes
-   arithmetic/logical results or the memory effective byte address.
+   immediate generator assembles the selected I/S/B/U/J immediate.
+3. Register reads and operand selection settle combinationally. ALU operand A
+   selects rs1 or current PC; operand B selects rs2 or the immediate. The ALU
+   computes arithmetic/logical results or the memory effective byte address.
 4. For a load, the environment aligns the effective address, assembles a
    little-endian 32-bit word, and supplies `data_read_data` before the rising
    edge. The lane selector chooses the byte/halfword and sign- or zero-extends
@@ -73,7 +86,9 @@ omits the shared clock wiring and individual reset-gating gates for readability.
 5. For a store, the core places the payload in the selected byte lanes and
    asserts `data_write_strb`; the testbench applies only those lanes at the
    committing edge, preserving the others.
-6. At the rising edge, enabled register writes and the PC update commit.
+6. Writeback selects the ALU result, load data, U immediate, or `PC+4`. The
+   next-PC path selects sequential, branch, JAL, or JALR behavior.
+7. At the rising edge, enabled register writes and the PC update commit.
 
 This is an event sequence through one single-cycle datapath, not pipeline stages.
 
@@ -85,6 +100,19 @@ selection for the greater-or-equal forms. Although the decoder selects ALU SUB
 for branches, the branch decision does not consume an ALU zero flag. The target
 adder uses the **current branch PC** plus the B immediate. No supported branch
 enables register-file or external data-memory writes.
+
+## Upper-immediate and jump path
+
+LUI routes the U immediate directly to writeback. AUIPC selects current PC as
+ALU operand A and the U immediate as operand B. JAL forms its target from the
+current PC plus the signed J immediate; JALR forms an ALU sum from rs1 plus the
+signed I immediate and clears target bit 0. Both jumps write `current_pc+4` to
+rd. The directed jump program verifies that sequential instructions skipped by
+JAL and JALR do not write their destination registers or memory.
+
+The current external instruction-memory contract uses four-byte-aligned word
+addresses. JALR bit 0 clearing is implemented, but no instruction-address-
+misalignment exception exists if a target has bit 1 set.
 
 ## Subword memory path
 
@@ -101,7 +129,7 @@ unsupported and unverified, with no misalignment exception.
 
 ## Why an array becomes flip-flops and MUXes
 
-`register_file.sv` declares 32 words of 32 bits. The v0.4 generic synthesis
+`register_file.sv` declares 32 words of 32 bits. The v0.5 generic synthesis
 reported 1024 enabled single-bit flip-flops and 1984 MUXes in this module.
 Two independent read addresses require two data-selection networks. A binary
 32-to-1 selection tree has 31 two-input MUXes per bit; `31 * 32 * 2 = 1984`
@@ -120,6 +148,6 @@ reads do not wait for a clock edge. Writes do. The overall load path may include
 register read, ALU address generation, external memory, and writeback. That is
 a candidate path to analyze later, not a measured critical path. See
 [synthesis.md](synthesis.md) for what has and has not been measured. The
-current v0.4 hierarchy reports 6142 generic cells; the v0.3 count of 5456 and
-earlier v0.2 count of 5372 are historical. These are generic structural counts,
-not physical area, Fmax, or STA.
+current v0.5 hierarchy reports 6642 generic cells; the v0.4 count of 6142,
+v0.3 count of 5456, and v0.2 count of 5372 are historical. These are generic
+structural counts, not physical area, Fmax, or STA.

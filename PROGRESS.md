@@ -1,23 +1,24 @@
 # P1 Development Progress
 
-Last updated: 2026-09-20
+Last updated: 2026-09-21
 
 ## Current Status
 
-**DAY17 / P1 v0.4 — byte and halfword memory implementation checkpoint and
+**DAY18 / P1 v0.5 — U-type and jump implementation, verification, and
 documentation/Git closeout.**
 
-The 33-instruction single-cycle subset executes PC-indexed programs using
+The 37-instruction single-cycle subset executes PC-indexed programs using
 external Python instruction/data memories. The latest full regression covers
-seven groups with 26/26 cocotb cases passing, and the core target passes 13/13.
-The decoder test is one cocotb case containing 37 vectors. These are separate
-from the 33 static instruction types; the current harness does not emit a
-dynamic-instruction execution count.
+seven groups with 28/28 cocotb cases passing, and the core target passes 15/15.
+The immediate-generator and decoder tests are one cocotb case each, containing
+13 and 42 vectors respectively. These are separate from the 37 static
+instruction types; the current harness does not emit a dynamic-instruction
+execution count.
 
-v0.4 adds LB/LBU/LH/LHU/SB/SH with a byte-addressed little-endian contract,
-lane-aligned store data, `data_write_strb[3:0]`, and signed/zero-extended load
-writeback. The owner authorized a combined code/documentation commit and push
-for this v0.4 closeout. No Git tag or GitHub Release was requested. Use
+v0.5 adds LUI/AUIPC/JAL/JALR, U/J immediate generation, PC-relative ALU input,
+`PC+4` link writeback, direct and indirect next-PC selection, and JALR target
+bit 0 clearing. The owner authorized a combined code/documentation commit and
+push for this v0.5 closeout. No Git tag or GitHub Release was requested. Use
 `git log`, remote verification, and the final closeout message for the
 resulting commit; this document does not equate a version label with a
 published release tag.
@@ -587,6 +588,43 @@ produced cascading zero-nanosecond failures. The case was fixed to initialize
 its own clock, reset, instruction input, load input, and address registers;
 the current case runs independently.
 
+## DAY18 — P1 v0.5 U-type and Jump Instructions
+
+Owner-written v0.5 changes are present in `rtl/immediate_generator.sv`,
+`rtl/decoder.sv`, `rtl/rv32i_core.sv`, `tb/test_immediate_generator.py`,
+`tb/test_decoder.py`, and `tb/test_core.py`. The immediate path now supports
+U and J formats. The decoder widens `imm_type` and `result_src`, and adds
+`alu_a_pc` plus `jump_type`. The core adds PC as an ALU-A choice, U-immediate
+and `PC+4` writeback choices, and jump target selection.
+
+Implemented semantics are LUI `rd=Uimm`, AUIPC `rd=current_pc+Uimm`, JAL
+`rd=current_pc+4` with target `current_pc+Jimm`, and JALR
+`rd=current_pc+4` with target `(rs1+Iimm)&~1`. JALR is enabled only for
+`funct3=000`. Jumps do not assert the external data-memory write path.
+
+Observed verification for the v0.5 implementation:
+
+- `make lint-core`: exit 0 with one reviewed immediate-generator
+  `UNUSEDSIGNAL` warning for unused opcode bits `instr[6:0]`.
+- `make test-immediate-generator`: 1/1 case passed, containing 13 vectors.
+- `make test-decoder`: 1/1 case passed, containing 42 vectors.
+- `make test-core`: 15/15 cases passed, 0 failed, 0 skipped.
+- `make regression SEED=20260921`: seven groups, 28/28 cases passed, 0 failed,
+  0 skipped, exit status 0.
+- Fresh generic Yosys synthesis: 6642 full-hierarchy primitive cells, 0
+  `check -assert` problems, 0 memory objects, 0 procedural processes, and no
+  inferred combinational latch. The result is structural evidence only, not
+  physical area, Fmax, or STA evidence.
+
+The new upper-immediate core case checks LUI at PC 0 and AUIPC at PC 4. The
+jump case observes `0 -> 4 -> 8 -> 16 -> 20 -> 40 -> 44`, verifies link values
+`x1=12` and `x3=24`, verifies that an odd JALR sum is rounded down by clearing
+target bit 0, and confirms the instructions at PC 12 and PC 24 do not modify
+their destination registers. J-immediate extraction also includes a negative
+`-4` component vector. A negative taken JAL in the integrated core, targets
+with bit 1 set, and instruction-address misalignment exceptions remain
+unverified.
+
 ## Current integration boundary and open work
 
 - Core instruction and data ports connect to external Python memory models.
@@ -598,39 +636,49 @@ the current case runs independently.
 - Misaligned halfword/word accesses that would span two aligned words remain
   unsupported/unverified because the one-word external interface does not
   assemble or split them; no misalignment or access-fault exception exists.
-- No U/J instruction support, bus handshake, trap, pipeline, STA, physical
-  area, or Fmax claim.
+- No bus handshake, instruction/data access exception, trap, pipeline, STA,
+  physical area, or Fmax claim.
+- JALR clears target bit 0. The instruction model otherwise assumes
+  four-byte-aligned PCs; targets with bit 1 set are unsupported/unverified and
+  do not raise an instruction-address-misaligned exception.
 - The planned 2026-09-18 v2.0 target date has passed. The schedule does not
   lower the verification standard or turn this checkpoint into a v2.0 release.
 - Reports, netlists, and waves are ignored by Git; tracked documents preserve
   the commands and observed summaries. Future runs regenerate local evidence.
 
-## Next-session handoff — start v0.5, not v0.4
+## Next-session handoff — start v1.0 stabilization, not v0.5
 
-DAY: DAY17 / v0.4 implementation checkpoint and documentation/Git closeout.
+DAY / version: DAY18 / v0.5 U-type and jump closeout.
 
-Completed: 33-instruction single-cycle core, v0.3 branch selection with
+Completed: 37-instruction single-cycle core, v0.3 branch selection with
 signed/unsigned comparisons, v0.4 byte/halfword memory operations,
-`data_write_strb` lane control, owner-written directed memory cases, 26/26
-full-regression evidence, current lint, v0.4 generic synthesis, and updated
-checkpoint documents.
+`data_write_strb` lane control, and v0.5 LUI/AUIPC/JAL/JALR with U/J
+immediates, PC/writeback selection, and jump targets. Current evidence is
+28/28 full regression, 15/15 core cases, lint exit 0, and v0.5 generic
+synthesis with 0 structural problems.
 
 Owner work demonstrated: branch decoder extension, `branch_type` interface
 completion, signed versus unsigned comparison selection, byte-lane and strobe
 selection, sign/zero extension, no-side-effect expectations, PC-indexed
-instruction driving, and external memory-model behavior. The owner has not
-claimed an independent whole-core reference model, formal proof, exhaustive
-branch or invalid-encoding coverage, STA, or physical PPA result.
+instruction driving, external memory-model behavior, U/J immediate assembly,
+PC-relative execution, `PC+4` link writeback, JALR bit-0 clearing, and skipped
+path checking. The owner has not claimed an independent whole-core reference
+model, formal proof, exhaustive branch/jump or invalid-encoding coverage, STA,
+or physical PPA result.
 
 Still explicitly unverified: initial-1 loop behavior; the reverse and
 equality boundaries for BLT/BGE/BLTU/BGEU; exhaustive ISA/invalid-encoding
 coverage; misaligned halfword/word accesses; and the full regression-runner
 error matrix. Initial 5 remains historical evidence only, while the current
-default loop uses initial 0.
+default loop uses initial 0. Negative integrated JAL behavior, jump targets
+with bit 1 set, and an instruction-address-misalignment exception are also
+unverified or unsupported as specified.
 
-Next milestone is v0.5: define and review U/J immediate and jump semantics
-before changing the core. Preserve the v0.3 relational-branch gaps, the
-initial-1 waiver, and the v0.4 misalignment boundary when planning that work.
+Next milestone is v1.0 stabilization: reconcile the implemented instruction
+list, control/data-path documentation, high-value remaining verification gaps,
+and a real basic timing-analysis plan. Preserve the v0.3 relational-branch
+gaps, the initial-1 waiver, and the v0.4/v0.5 alignment boundaries instead of
+silently relabeling them as verified.
 
 Read first: `PROJECT_PLAN.md`, `README.md`, `docs/specification.md`, this
 handoff, and the current RTL/tests. Preserve mentor mode and do not repeat

@@ -1,6 +1,6 @@
-# v0.4 Learning and Ownership Notes
+# v0.5 Learning and Ownership Notes
 
-Recorded at DAY17, 2026-09-20. These are topics practiced or explained, not a
+Recorded at DAY18, 2026-09-21. These are topics practiced or explained, not a
 claim that every topic has passed an independent oral assessment.
 
 ## Owner-written work
@@ -11,6 +11,8 @@ claim that every topic has passed an independent oral assessment.
   primary branch cases.
 - v0.4 decoder extension, byte/halfword lane selection, write strobes, and
   primary subword memory cases.
+- v0.5 U/J immediate extension, upper-immediate and jump decoder controls,
+  PC/ALU/writeback selection, and primary LUI/AUIPC/JAL/JALR cases.
 - PC-indexed program execution and external Python memory behavior.
 - The regression runner, rebuilt incrementally after the owner rejected an
   earlier complete assistant-written version.
@@ -55,8 +57,18 @@ the owner; no existing third-party CPU implementation was imported.
 - Test-case counts, vector counts, instruction support, and coverage are
   different quantities. Historical evidence must not be relabeled as current
   default regression coverage.
+- LUI writes the U immediate itself, whereas AUIPC adds that immediate to the
+  current instruction PC. This requires a separate ALU-A choice rather than
+  changing the meaning of the existing rs1 path.
+- JAL and JALR both write `PC+4`, but their targets come from different paths:
+  `PC+Jimm` versus `rs1+Iimm`. JALR then clears target bit 0.
+- A jump test must prove both where execution goes and what does not execute.
+  Checking the skipped destination registers catches wrong-path side effects.
+- Clearing JALR bit 0 is not an instruction-address-misalignment implementation.
+  Under a four-byte-aligned instruction interface, target bit 1 still needs an
+  explicit contract or exception path.
 
-## v0.3 and v0.4 instruction-group lessons
+## v0.3 through v0.5 instruction-group lessons
 
 - Signed `SLT/SLTI` and unsigned `SLTU/SLTIU` use different comparison
   interpretations even though both return only 0 or 1. `SLTIU` still receives
@@ -70,9 +82,10 @@ the owner; no existing third-party CPU implementation was imported.
 - `reg_write` controls the register-file write port. `data_write_en` is the
   external data-memory write signal used by SW; an ALU instruction should not
   assert the latter.
-- The v0.4 decoder test is one cocotb case containing 37 vectors; the core
-  target reaches 13 cases and the full regression reaches 26 cases. The
-  implemented subset contains 33 instruction types. Dynamic instruction
+- The v0.5 immediate and decoder tests are one cocotb case each containing 13
+  and 42 vectors; the core target reaches 15 cases and the full regression
+  reaches 28 cases. The implemented subset contains 37 instruction types.
+  Dynamic instruction
   executions are not instrumented. Instruction-type, vector, cocotb-case, and
   dynamic-instruction counts remain separate evidence categories.
 - A cocotb case must initialize its own clock, reset, inputs, and architectural
@@ -89,6 +102,9 @@ complete independent datapath explanation from that exchange alone.
 Before claiming synthesis/STA expertise, independently explain what a generic
 cell count means, what a warning does and does not establish, and why a testbench
 clock period does not prove an achievable hardware frequency. STA has not run.
+Before calling jump handling independently mastered, explain why JAL uses the
+current PC, why link data is `PC+4`, why JALR clears bit 0, and why skipped
+instructions cannot have side effects.
 
 ## Next-session teaching contract
 
@@ -97,6 +113,7 @@ and important test logic. Explain Python through the owner's C background when
 needed. Auxiliary argument parsing, log formatting, and Git commands are not
 separate line-by-line assignments. Group related instructions, preserve actual
 verification, honor explicitly skipped cases, and start at the nearest
-unfinished feature. v0.5 begins with a contract for U/J immediates and jump
-PC/writeback behavior; do not implement that feature from this closeout note
-alone.
+unfinished feature. v1.0 begins with a stabilization audit of the implemented
+37-instruction core, its remaining high-value verification gaps, and the tool
+requirements for honest basic timing analysis; do not begin the v2.0 pipeline
+from this closeout note alone.
