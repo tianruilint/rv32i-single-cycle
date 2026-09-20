@@ -1,6 +1,6 @@
-# v0.3 Verification Plan and Evidence
+# v0.4 Verification Plan and Evidence
 
-Checkpoint: 2026-09-19. Results below are observed, not proposed coverage.
+Checkpoint: 2026-09-20. Results below are observed, not proposed coverage.
 
 ## Layers and responsibilities
 
@@ -22,7 +22,7 @@ functional/line/branch coverage measurement in this checkpoint.
 Executed from the repository root in WSL:
 
 ```sh
-make regression SEED=20260919
+make regression SEED=20260920
 ```
 
 | Target | Test source | XML under reports/ | Cases / pass / fail / skip |
@@ -33,14 +33,21 @@ make regression SEED=20260919
 | test-pc | test_pc.py | pc.xml | 3 / 3 / 0 / 0 |
 | test-immediate-generator | test_immediate_generator.py | immediate_generator.xml | 1 / 1 / 0 / 0 |
 | test-decoder | test_decoder.py | decoder.xml | 1 / 1 / 0 / 0 |
-| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 11 / 11 / 0 / 0 |
-| **Total** | | | **24 / 24 / 0 / 0** |
+| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 13 / 13 / 0 / 0 |
+| **Total** | | | **26 / 26 / 0 / 0** |
 
-Exit status: 0. Test count is distinct from vector count and instruction count.
+Exit status: 0. Test count is distinct from vector count, instruction-type
+count, and dynamic-instruction count.
 The ALU's 19 directed vectors and 2000 seeded vectors are grouped into two
 cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
-29 legal and boundary instruction vectors. The implemented subset contains
-27 instruction types; these counts are not interchangeable.
+37 legal and boundary instruction vectors. The implemented subset contains
+33 instruction types. The current testbench and regression runner do not
+instrument or report a dynamic-instruction execution count; no dynamic total
+is inferred from the case or vector counts.
+
+`Makefile` keeps `CORE_TEST_MODULES := test_core,test_lw_sw,test_beq,test_program`;
+the two new subword cases are discovered through the existing `test_lw_sw`
+module, so no redundant regression entry was added.
 
 ## Core cases and architectural expectations
 
@@ -49,6 +56,8 @@ cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
 | test_arithmetic_chain | ADD/ADDI/SUB/AND/ANDI/OR/ORI/SLT/SLTI results, PC progression, x0 protection |
 | test_reset_blocks_register_write | Existing x13 value survives an attempted write while reset forces PC=0 |
 | test_lw_sw | Store 42 at byte address 72 and load 42 into x3 |
+| test_subword_load_store | LB/LBU/LH/LHU/SB/SH behavior, sign/zero extension, lane-aligned stores, and byte preservation |
+| test_subword_lane_boundaries | All four byte lanes, both aligned halfword lanes, and load-side lane selection |
 | test_beq | Taken +8, not taken, negative -12 branch; a taken BEQ's write enables are checked inactive |
 | test_bne | Equal operands not taken and unequal operands taken; both branch write enables inactive |
 | test_blt_bge | Signed -1 versus 1: BLT taken and BGE not-taken; both branch write enables inactive |
@@ -58,12 +67,13 @@ cocotb cases, not 2019 cases. The decoder test is one cocotb case containing
 | test_xor_sltu_instrs | XOR/XORI and SLTU/SLTIU results, including unsigned ordering and sign-extended immediate behavior |
 | test_shift_instrs | SLL/SLLI, SRL/SRLI, SRA/SRAI; shift amount 31, register source 32, final PC=52, and `data_write_en=0` |
 
-This exercises the 27 supported instruction types, but does not prove all their
+This exercises the 33 supported instruction types, but does not prove all their
 input combinations or all side effects under every condition. In particular,
-not every unsupported encoding, reset/memory interaction, or alignment case is
-tested. The relational branch reverse directions and equality boundaries are
-not tested. Current tests inspect internal register storage for some assertions;
-that hierarchy is a test dependency, not a stable external hardware interface.
+not every unsupported encoding, reset/memory interaction, or misaligned
+halfword/word access is tested. The relational branch reverse directions and
+equality boundaries are not tested. Current tests inspect internal register
+storage for some assertions; that hierarchy is a test dependency, not a stable
+external hardware interface.
 
 ## Loop variants: current versus historical
 
@@ -87,13 +97,23 @@ documentation work. Do not add initial 1 after it was explicitly waived.
 ## Memory-model ordering
 
 The test supplies `instr`, lets combinational signals settle, converts DUT
-addresses with `int(...)`, and supplies load data before the rising edge.
-It captures SW address/data/enable for the committing edge and updates the
-Python dictionary for that transaction. After the edge, it allows signal
-updates to settle before inspecting architectural state.
+addresses with `int(...)`, and supplies aligned little-endian load data before
+the rising edge. It captures store address/data/enable/strobe for the
+committing edge and updates only the selected bytes in the Python dictionary.
+After the edge, it allows signal updates to settle before inspecting
+architectural state. `read_word` assembles an aligned 32-bit word and
+`apply_write` preserves bytes whose strobe bits are zero.
 
-No real SRAM, memory latency, or ready/valid handshake is modeled. Literal
-machine words are embedded in Python; no assembler/program-image build is run.
+No real SRAM, memory latency, ready/valid handshake, cross-word assembly/split,
+or alignment exception is modeled. Literal machine words are embedded in
+Python; no assembler/program-image build is run. LB/LBU/SB may use any byte
+address; LH/LHU/SH require bit 0 clear; LW/SW require bits [1:0] clear.
+
+The new `test_subword_lane_boundaries` case initially omitted its own
+clock/reset/x1/x2 initialization. The simulator shut down prematurely and
+produced cascading zero-nanosecond failures. The case now initializes its own
+clock, reset, instruction input, load input, and address registers, so it runs
+independently of the other `test_lw_sw` cases.
 
 ## Runner behavior and limitations
 
@@ -119,7 +139,7 @@ immutable run archive is generated. A failure opening a log or launching Make
 is not handled by the report-parsing exception handler.
 
 `--seed` is parsed by the runner and passed through the subprocess environment
-as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260919`.
+as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260920`.
 `random.Random(20260906)` in the ALU test is independently seeded. Reproduction
 also requires the same source, test selection, and compatible toolchain; the
 seed alone is not a complete environment record.
@@ -146,9 +166,9 @@ implemented. Wave targets share `dump.fst`; do not run them concurrently.
 For each agreed group: define semantics/encoding and hardware corner cases,
 let the owner implement RTL and principal tests, run directed and useful
 boundary tests, inspect any real failure, then rerun the existing regression.
-For v0.4, first define byte-addressed little-endian lane selection, write
-strobes and byte preservation, signed/zero extension, and alignment/access
-exceptions; only then change the core and Python memory model. Only claim
-newly implemented instruction support after those tests execute. Formal
-verification, exhaustive coverage, and a whole-core reference model remain
-separate future decisions, not existing results.
+The v0.4 memory contract is now implemented and tested at its supported
+alignment boundaries. Only claim newly implemented instruction support after
+those tests execute. Formal verification, exhaustive coverage, a dynamic
+instruction counter, and a whole-core reference model remain separate future
+decisions, not existing results. The next milestone is v0.5 U/J and jump
+planning.

@@ -1,7 +1,7 @@
-# P1 v0.3 Implemented Processor Specification
+# P1 v0.4 Implemented Processor Specification
 
-Checkpoint: DAY16, 2026-09-19. This document specifies the implemented subset,
-not the complete RV32I ISA or the future v0.4+ design.
+Checkpoint: DAY17, 2026-09-20. This document specifies the implemented subset,
+not the complete RV32I ISA or the future v0.5+ design.
 
 ## Scope
 
@@ -11,7 +11,7 @@ input and a separate external data-memory interface. The synthesized top is
 `immediate_generator`, and `alu`.
 
 Instruction and data memories are supplied by cocotb/Python. No RTL instruction
-ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.3.
+ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.4.
 Automated tests check register values, memory values, PC, and selected control
 signals. They do not establish complete ISA compliance.
 
@@ -27,15 +27,16 @@ Directions are relative to `rv32i_core`. Data/address ports are unsigned
 | `instr` | input | 32 | External instruction word for `current_pc` |
 | `data_read_data` | input | 32 | External load data, stable before the commit edge |
 | `current_pc` | output | 32 | Current instruction byte address |
-| `data_addr` | output | 32 | ALU result; effective byte address for LW/SW |
-| `data_write_data` | output | 32 | Current rs2 value, used by SW |
-| `data_write_en` | output | 1 | Qualified SW write enable, forced low during reset |
+| `data_addr` | output | 32 | ALU result; full effective byte address for memory accesses |
+| `data_write_data` | output | 32 | Lane-aligned store payload for SB/SH/SW |
+| `data_write_en` | output | 1 | Decoded store enable, forced low during reset |
+| `data_write_strb` | output | 4 | Little-endian byte-lane write strobe; zero for loads and unsupported store alignment |
 
-There is no read-enable, valid/ready, byte-enable, stall, exception, or halt port.
-The program test identifies LW from `instr` to decide when to supply read data.
-For non-memory instructions, `data_addr` and `data_write_data` may still change;
-they do not indicate a memory operation without the relevant instruction or
-write enable.
+There is no read-enable, valid/ready, stall, access-fault/misalignment exception,
+or halt port. The program test identifies load instructions from `instr` to
+decide when to supply read data. For non-memory instructions, `data_addr`,
+`data_write_data`, and `data_write_strb` may still change; they do not indicate
+a memory operation without the relevant instruction or write enable.
 
 ## Architectural state and timing
 
@@ -74,7 +75,13 @@ write enable.
 | SLL / SLLI | Logical left shift by `rs2[4:0]` / `shamt` |
 | SRL / SRLI | Logical right shift by `rs2[4:0]` / `shamt` |
 | SRA / SRAI | Arithmetic right shift by `rs2[4:0]` / `shamt` |
+| LB | `rd = sign_extend(external_byte[rs1 + Iimm])` |
+| LBU | `rd = zero_extend(external_byte[rs1 + Iimm])` |
+| LH | `rd = sign_extend(external_halfword[rs1 + Iimm])` |
+| LHU | `rd = zero_extend(external_halfword[rs1 + Iimm])` |
 | LW | `rd = external_word[rs1 + Iimm]` |
+| SB | `external_byte[rs1 + Simm] = rs2[7:0]` |
+| SH | `external_halfword[rs1 + Simm] = rs2[15:0]` |
 | SW | `external_word[rs1 + Simm] = rs2` |
 | BEQ | If rs1 equals rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 | BNE | If rs1 does not equal rs2, next PC is current PC + Bimm; otherwise PC + 4 |
@@ -83,10 +90,11 @@ write enable.
 | BLTU | If unsigned rs1 is less than unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 | BGEU | If unsigned rs1 is greater than or equal to unsigned rs2, next PC is current PC + Bimm; otherwise PC + 4 |
 
-These grouped rows describe 27 instruction types. All register-writing
-operations obey x0 behavior. BEQ has no register or memory write side effects.
-Supported non-branch instructions advance PC by four. ANDI and ORI also use
-sign extension, not zero extension.
+These grouped rows describe 33 instruction types. All register-writing
+operations obey x0 behavior. Branches have no register or memory write side
+effects. Supported non-branch instructions advance PC by four. The load
+extension rules are signed for LB/LH and zero-filled for LBU/LHU. ANDI and ORI
+also use sign extension, not zero extension.
 
 For RV32 register shifts, only the low five bits of the shift source are used.
 Immediate shifts use the five-bit `shamt = instr[24:20]`. SLLI is legal only
@@ -102,18 +110,34 @@ drive PC. An absent dictionary entry fails the Python test, not an architectural
 fetch exception. Program-completion PC values are testbench sentinels; there is
 no CPU halt instruction or halt mechanism.
 
-The data model maps byte addresses to whole 32-bit words. For SW, the testbench
-captures settled address/data/enable and applies the write at the associated
-rising edge. For LW, it supplies the selected word before the rising edge so
-the core can capture it in the register file. An uninitialized dictionary read
-is not defined to return zero; the current program initializes its load address
-with SW first.
+The external data model owns a byte-addressed, little-endian dictionary. The
+core exports the full 32-bit effective byte address in `data_addr`. For a load,
+the Python model aligns that address down to a four-byte base, assembles bytes
+`base+0` through `base+3` into `data_read_data[31:0]`, and supplies the word
+before the committing rising edge. The core selects the byte or aligned
+halfword using `data_addr[1:0]`, then performs the specified sign or zero
+extension. LW consumes the aligned 32-bit word.
 
-v0.3 verification assumes 4-byte-aligned instructions, branch destinations,
-and LW/SW addresses. RTL does not detect or trap misalignment or access faults.
-B-immediate reconstruction fixes bit 0 to zero but does not enforce bit 1.
-No byte-addressable storage layout or endianness test exists yet; v0.4 must
-define that contract before adding subword accesses.
+For a store, the Python model samples settled `data_addr`, `data_write_data`,
+`data_write_en`, and `data_write_strb` for the committing edge. It updates only
+the byte lanes whose strobe bits are set; all other bytes in the aligned word
+are preserved. `data_write_data` is lane-aligned: SB places `rs2[7:0]` in the
+selected lane, SH places `rs2[15:0]` in lanes 0/1 or 2/3, and SW uses all four
+lanes. Strobe bit 0 corresponds to the lowest-address byte, so the supported
+patterns are SB `0001/0010/0100/1000`, SH `0011/1100`, and SW `1111`.
+
+Alignment limits are part of the v0.4 contract: LB/LBU/SB may use any byte
+address; LH/LHU/SH require `data_addr[0] == 0`; and LW/SW require
+`data_addr[1:0] == 2'b00`. Misaligned halfword/word accesses may span two
+aligned words. The current one-word external interface does not assemble or
+split such transactions and the RTL has no misalignment or access-fault trap,
+so those accesses are unsupported and unverified rather than supported
+architectural behavior.
+
+The RTL contains no instruction or data memory. Python owns dictionary contents,
+word assembly, and strobe-preserving writes through the test helpers
+`read_word` and `apply_write`. An uninitialized dictionary read is not defined
+to return zero.
 
 ## Branch controls
 
@@ -134,7 +158,7 @@ returns zero. U/J formats are not implemented.
 
 The core uses ALU ADD=`0000`, SUB=`0001`, AND=`0010`, OR=`0011`, XOR=`0100`,
 SLL=`0101`, SRL=`0110`, SRA=`0111`, SLT=`1000`, and SLTU=`1001`. See
-[control_table.md](control_table.md) for all v0.3 controls and encoding
+[control_table.md](control_table.md) for all v0.4 controls and encoding
 qualification rules.
 
 Unsupported opcodes or invalid combinations for the supported instruction
@@ -150,7 +174,8 @@ shift-immediate forms are the deliberate exception described above.
 
 ## Unsupported features and deferred work
 
-- LB/LBU/LH/LHU/SB/SH and byte-write masks (v0.4).
+- Misaligned halfword/word accesses that require two aligned external words;
+  no split/assemble path or misalignment trap exists.
 - LUI/AUIPC/JAL/JALR and U/J immediates (v0.5).
 - FENCE, ECALL, EBREAK, CSR/privileged/trap/interrupt machinery.
 - Variable-latency memories, buses, caches, MMU, and pipeline hazards.
@@ -162,17 +187,21 @@ silently extending this implemented specification.
 
 ## Validation boundary
 
-The 2026-09-19 v0.3 regression passed 24/24 cocotb cases across seven groups,
-including 11 core cases. The decoder test is one case with 29 vectors. The
-implemented subset is 27 instruction types. Branch tests cover BNE equality
-and inequality, one signed BLT/BGE ordering, and one unsigned BLTU/BGEU
-ordering, with branch write enables checked inactive.
+The 2026-09-20 v0.4 regression passed 26/26 cocotb cases across seven groups,
+including 13 core cases. The decoder test is one case with 37 vectors. The
+implemented subset is 33 instruction types; the current harness does not report
+a dynamic-instruction execution count. Branch tests cover BNE equality and
+inequality, one signed BLT/BGE ordering, and one unsigned BLTU/BGEU ordering,
+with branch write enables checked inactive. Subword tests cover aligned lane
+selection, sign/zero extension, strobe patterns, and preservation of bytes not
+selected by a store.
 
 The reverse-direction and equality boundaries for BLT/BGE/BLTU/BGEU remain
 unverified. Initial 5 is historical evidence, initial 0 is the current saved
-program, and initial 1 remains intentionally unverified. Generic v0.3
-synthesis passed with no inferred combinational latch and 0 problems from
-`check -assert`, with 5456 generic cells. Neither this nor the directed
+program, and initial 1 remains intentionally unverified. Misaligned
+halfword/word accesses are unsupported and unverified. Generic v0.4 synthesis
+passed with no inferred combinational latch and 0 problems from `check -assert`,
+with 6142 generic cells. Neither this nor the directed
 regression proves all possible executions correct. See
 [verification_plan.md](verification_plan.md) and [synthesis.md](synthesis.md)
 for exact evidence and open coverage gaps.

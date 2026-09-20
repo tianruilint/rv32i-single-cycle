@@ -3,21 +3,22 @@
 An owner-written educational 32-bit single-cycle CPU with automated
 SystemVerilog/Verilator/cocotb verification.
 
-**Current checkpoint: DAY16 / P1 v0.3 implementation checkpoint,
-documented on 2026-09-19.**
+**Current checkpoint: DAY17 / P1 v0.4 implementation checkpoint,
+documented on 2026-09-20.**
 This is a verified **RV32I-subset** core, not a complete RV32I implementation.
 Version names identify development milestones; no Git tag or GitHub Release is
 implied.
 
 ## Implemented scope
 
-The integrated core supports these **27 instruction types**:
+The integrated core supports these **33 instruction types**:
 
 - ADD, ADDI, SUB
 - AND, ANDI, OR, ORI, XOR, XORI
 - SLT, SLTI, SLTU, SLTIU
 - SLL, SLLI, SRL, SRLI, SRA, SRAI
-- LW, SW
+- LB, LBU, LH, LHU, LW
+- SB, SH, SW
 - BEQ, BNE, BLT, BGE, BLTU, BGEU
 
 `rtl/rv32i_core.sv` connects the PC, decoder, register file, immediate generator,
@@ -27,9 +28,18 @@ The program tests fetch instruction words using the DUT's `current_pc`.
 
 The v0.2 decoder selects XOR/XORI, unsigned comparisons, and register or
 immediate shifts. The v0.3 decoder adds `branch_type` selection for BNE, BLT,
-BGE, BLTU, and BGEU. Immediate shifts qualify the upper immediate bits
-according to the RV32I encoding; ordinary I-type arithmetic continues to treat
-those bits as immediate data.
+BGE, BLTU, and BGEU. The v0.4 decoder adds the byte/halfword load/store
+encodings. Immediate shifts qualify the upper immediate bits according to the
+RV32I encoding; ordinary I-type arithmetic continues to treat those bits as
+immediate data.
+
+The data interface uses a full 32-bit byte address and an aligned 32-bit
+little-endian `data_read_data` word supplied by the external Python model.
+`data_write_strb[3:0]` selects the written byte lanes, and
+`data_write_data` places SB/SH payload bytes in those lanes. LB/LBU/SB may use
+any byte address; LH/LHU/SH require address bit 0 to be zero; LW/SW require
+address bits [1:0] to be zero. Misaligned halfword/word accesses that span two
+aligned words are unsupported and unverified; no misalignment trap exists.
 Read the [specification](docs/specification.md),
 [datapath diagram](docs/datapath.md), and
 [control table](docs/control_table.md) for the precise boundary.
@@ -56,16 +66,16 @@ Do not recreate an existing working environment. Normal checks are:
 ```sh
 make env
 make lint-core
-make regression SEED=20260919
+make regression SEED=20260920
 ```
 
 `make regression` runs all seven test groups, reports case counts and failed
 targets, and returns a nonzero status on a detected failure. It must run from
 the repository root. `make test` alone still tests **only the full adder**.
 
-## Verified v0.3 results
+## Verified v0.4 results
 
-Full regression run on 2026-09-19:
+Full regression run on 2026-09-20:
 
 | Target | cocotb cases | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -75,24 +85,32 @@ Full regression run on 2026-09-19:
 | `test-pc` | 3 | 3 | 0 | 0 |
 | `test-immediate-generator` | 1 | 1 | 0 | 0 |
 | `test-decoder` | 1 | 1 | 0 | 0 |
-| `test-core` | 11 | 11 | 0 | 0 |
-| **Total** | **24** | **24** | **0** | **0** |
+| `test-core` | 13 | 13 | 0 | 0 |
+| **Total** | **26** | **26** | **0** | **0** |
 
-The process exited with status 0. These are test-case counts, not instruction
-counts or coverage percentages. The current core target simulated for 781 ns;
-this is not an implementation-performance measurement.
+The process exited with status 0. These are cocotb test-case counts, not
+instruction-type counts, decoder-vector counts, dynamic-instruction counts, or
+coverage percentages. Any simulator time printed for the core target is a
+simulation detail, not an implementation-performance measurement.
 
-The eleven core cases check arithmetic, reset write blocking, LW/SW, BEQ,
-BNE, signed BLT/BGE, unsigned BLTU/BGEU, PC-indexed straight-line execution,
-a zero-initialized loop/store/load program, XOR/unsigned comparisons, and the
-register/immediate shift group. The new branch cases check `rf_we=0` and
-`data_write_en=0`.
+The thirteen core cases check arithmetic, reset write blocking, LW/SW, the
+subword load/store sequence, byte and halfword lane boundaries, BEQ, BNE,
+signed BLT/BGE, unsigned BLTU/BGEU, PC-indexed straight-line execution, a
+zero-initialized loop/store/load program, XOR/unsigned comparisons, and the
+register/immediate shift group. The branch cases check `rf_we=0` and
+`data_write_en=0`; the subword cases also check `data_write_strb=0` for loads,
+lane-aligned write data, and byte preservation.
 The shift case includes shift amount 31 and a register shift source of 32 to
 verify RV32's low-five-bit rule; it also checks that these ALU instructions do
 not assert `data_write_en`. The straight-line program finishes with
 `x3=12`, `PC=12`.
 The currently saved second program finishes with
 `x1=x2=x3=memory[64]=0`, `PC=32`.
+
+The decoder test is one cocotb case containing 37 legal and boundary vectors.
+The integrated subset contains 33 instruction types. The current testbench and
+regression runner do not instrument or report a dynamic-instruction execution
+count; none is inferred from the 26 cocotb cases or 37 vectors.
 
 The initial-5 loop previously passed with sum 15, but that variant was replaced
 by initial 0 in the saved test. It is **historical evidence, not an additional
@@ -104,7 +122,7 @@ acceptance. See the
 
 Each group refreshes its XML in `reports/`. The runner saves stdout and stderr
 to `reports/regression/<target>.log`, overwriting that target's previous log.
-All seven latest logs confirm supplied cocotb seed `20260919`.
+All seven latest logs confirm supplied cocotb seed `20260920`.
 The ALU's independent reference-vector generator uses fixed seed `20260906`;
 changing `SEED` does not change that generator.
 
@@ -121,7 +139,8 @@ make waves-core
 ```
 
 `test-core` and `waves-core` select
-`test_core,test_lw_sw,test_beq,test_program`. Wave generation is explicit, not
+`test_core,test_lw_sw,test_beq,test_program`; the new subword cases are already
+included through the existing `test_lw_sw` module. Wave generation is explicit, not
 automatic on failure. `waves-core` writes `waves/core.fst`; inspect it with
 GTKWave. Run waveform targets serially: they use the shared `dump.fst` name.
 
@@ -137,19 +156,19 @@ No warning class was disabled. `-Wno-fatal` keeps warnings visible while
 allowing the command to complete; status 0 does not mean warning-free RTL.
 
 Generic Yosys synthesis and `check -assert` succeeded with 0 reported structural
-problems. The current v0.3 hierarchy contains **5456 generic cells**, including
-1024 register-file enabled flip-flops, 32 PC flip-flops, and 169 decoder cells.
-No latch was inferred from the combinational processes. These are tool/run-specific
-structural counts, **not silicon area or Fmax**. No target technology library,
-STA, post-layout timing, or gate-level equivalence result is claimed. The v0.2
-count of 5372 is historical and is not the v0.3 result.
+problems. The current v0.4 hierarchy contains **6142 generic cells**, including
+1024 register-file enabled flip-flops, 32 PC flip-flops, and 172 decoder cells;
+0 memory objects and 0 combinational latches were observed. These are
+tool/run-specific structural counts, **not silicon area or Fmax**. No target
+technology library, STA, post-layout timing, or gate-level equivalence result is
+claimed. The v0.3 count of 5456 and v0.2 count of 5372 are historical.
 
 The [synthesis record](docs/synthesis.md) contains the exact command, hierarchy,
 warning disposition, and reproduction instructions. Generated evidence:
 
 - `reports/lint/day13-core.log`
-- `reports/synthesis/v0.3-core.log`
-- `build/synthesis/v0.3-rv32i_core.v` (generated netlist, not hand-written source)
+- `reports/synthesis/v0.4-core.log`
+- `build/synthesis/v0.4-rv32i_core.v` (generated netlist, not hand-written source)
 
 ## Repository map
 
@@ -165,12 +184,15 @@ warning disposition, and reproduction instructions. Generated evidence:
 
 ## Limitations and next session
 
-- Only the 27 listed instruction types are supported; no jump, upper-immediate,
-  subword memory, CSR, trap, interrupt, or privileged support.
+- Only the 33 listed instruction types are supported; no jump, upper-immediate,
+  CSR, trap, interrupt, or privileged support.
 - Memory has no ready/valid protocol or variable latency; tests supply reads
   before the committing clock edge and model writes at the edge.
-- Tests use aligned instructions and word accesses. Alignment/access faults
-  are not implemented; byte ordering is not verified by a word-only model.
+- Byte accesses may use any byte address. Halfword accesses are supported only
+  at even addresses, and word accesses only at four-byte-aligned addresses.
+  Misaligned halfword/word accesses are not assembled/split across words and
+  have no access-fault or misalignment exception; they are unsupported and
+  unverified.
 - No whole-core ISA reference interpreter or formal verification is claimed.
 - Programs are literal machine words in Python; assembler-to-image automation
   is deferred. No additional Python infrastructure exercise is required before
@@ -179,13 +201,11 @@ warning disposition, and reproduction instructions. Generated evidence:
   exercised end-to-end. XML-reader failure/skipped counting was checked using
   a retained real failure report.
 
-This closeout stops at **DAY16 / v0.3**. Start the next session with
+This closeout stops at **DAY17 / v0.4**. Start the next session with
 `PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before planning
-v0.4 byte/halfword memory. First settle the byte-addressed little-endian
-contract, low-bit lane selection, write strobes, byte preservation,
-sign/zero extension, and alignment/access exceptions; only then change the
-core and Python memory model. Core RTL and primary verification logic remain
-the owner's work.
+v0.5 U/J and jump support. Preserve the documented v0.3 branch gaps, initial-1
+waiver, and v0.4 misalignment boundary. Core RTL and primary verification logic
+remain the owner's work.
 
 ## References and attribution
 

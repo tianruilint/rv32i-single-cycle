@@ -6,32 +6,34 @@
 >
 > Every Codex session MUST read this file before modifying the project.
 
-## Current checkpoint and session boundary — 2026-09-19
+## Current checkpoint and session boundary — 2026-09-20
 
-**DAY16 / P1 v0.3 is the current branch implementation checkpoint.** The
-documentation and Git closeout is authorized; do not implement v0.4 during
-this session.
+**DAY17 / P1 v0.4 is the current byte/halfword memory implementation
+checkpoint.** Documentation and Git closeout are authorized; v0.4 RTL/test
+changes are owner-written and frozen for this closeout.
 
-- Implemented: the 27-instruction single-cycle subset, PC-indexed Python
-  instruction memory, external Python data memory, program-level tests, and
-  BNE/BLT/BGE/BLTU/BGEU branch selection.
-- Latest full regression: seven groups, 24/24 cocotb cases, 0 failed/skipped,
+- Implemented: the 33-instruction single-cycle subset, PC-indexed Python
+  instruction memory, external Python data memory, program-level tests,
+  BNE/BLT/BGE/BLTU/BGEU branch selection, and LB/LBU/LH/LHU/SB/SH.
+- Latest full regression: seven groups, 26/26 cocotb cases, 0 failed/skipped,
   exit status 0; seed forwarding and seven per-target logs verified.
-- Core target: 11/11 cases passed. The decoder test remains one case with 29
-  vectors.
+- Core target: 13/13 cases passed. The decoder test is one case with 37
+  vectors. The testbench does not report a dynamic-instruction count.
 - Lint: one reviewed immediate-generator `UNUSEDSIGNAL` warning, no error.
-- v0.3 generic Yosys synthesis: 5456 generic cells, no inferred combinational
-  latch, `check -assert` reports 0 problems. No technology-specific area or
-  STA claim.
+- v0.4 generic Yosys synthesis: 6142 generic cells, no inferred combinational
+  latch, `check -assert` reports 0 problems, and 0 memory objects remain. No
+  technology-specific area or STA claim.
 - Current saved loop test uses initial 0. Initial 5 passed historically but is
   not retained as a separate default case. Initial 1 remains explicitly skipped.
 - Relational branch reverse-direction and equality boundaries remain
   unverified; the passing regression is not exhaustive branch acceptance.
+- Misaligned halfword/word accesses that would span two aligned words are
+  unsupported and unverified; no misalignment or access-fault exception exists.
 - DAY12 assembler-to-image automation is deferred, not completed. Automatic
   failure-wave generation was optional and is not implemented.
 - The planned 2026-09-18 v2.0 target date has passed; the repository remains
-  at v0.3 and the verification standard is not lowered.
-- v0.3 is a local technical/documentation checkpoint. Commit/push are
+  below v1.0 and the verification standard is not lowered.
+- v0.4 is a local technical/documentation checkpoint. Commit/push are
   authorized for this closeout; no Git tag or GitHub Release is requested.
 
 Authority order: latest explicit owner instruction, latest agreed milestone
@@ -1399,9 +1401,9 @@ At this point P1 becomes a legitimate project artifact.
 
 ---
 
-# 22. Post-DAY16 — P1 v1.0 Development
+# 22. Post-DAY17 — P1 v1.0 Development
 
-After v0.3 is stable enough to hand off its documented verification gaps:
+After v0.4 is stable enough to hand off its documented verification gaps:
 
 Expand instruction support systematically.
 
@@ -1412,23 +1414,21 @@ checkpoints on the path to v1.0, not release tags.
 | --- | --- | --- |
 | v0.2 / Phase A | XOR/XORI, shifts, SLTU/SLTIU | Decoder extension, shift-encoding qualification, instruction tests; **closed 2026-09-16** |
 | v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests; **implementation checkpoint 2026-09-19, reverse/equality gaps remain** |
-| v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests |
+| v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests; **closed 2026-09-20, misaligned halfword/word accesses remain unsupported/unverified** |
 | v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests |
 | v1.0 | Stable expanded single-cycle CPU | Verification gaps, RTL fixes, reproducible synthesis and basic STA |
 | v2.0 | Five-stage pipeline, after the v1.0 stability gate | Pipeline registers, forwarding, hazards, stall/bubble/flush, tests |
 
-### Next-session starting task: v0.4 planning and contract
+### Next-session starting task: v0.5 planning and contract
 
-1. Read the v0.3 handoff in `PROGRESS.md`, confirm the checkout/remote state,
-   and keep the recorded relational-branch gaps visible.
-2. Start in `docs/specification.md`: decide the byte-addressed little-endian
-   contract, including low-address-bit lane selection and how word addresses
-   map to byte lanes.
-3. Define write strobes and the rule for preserving bytes not selected by
-   SB/SH; define signed versus zero extension for LB/LBU/LH/LHU.
-4. Decide the alignment/access-exception behavior before changing RTL.
-5. Only then update `rtl/rv32i_core.sv`, the Python data-memory model, and
-   directed tests. Do not silently implement v0.4 during this closeout.
+1. Read the v0.4 handoff in `PROGRESS.md`, confirm the checkout/remote state,
+   and keep the recorded relational-branch gaps, initial-1 waiver, and v0.4
+   misalignment boundary visible.
+2. Start in `docs/specification.md`: define U/J immediate semantics and the
+   PC and writeback behavior for LUI, AUIPC, JAL, and JALR.
+3. Decide jump alignment and link-address behavior before changing RTL.
+4. Only then update `rtl/rv32i_core.sv`, the decoder/immediate path, and
+   directed tests. Do not silently expand v0.4 during this closeout.
 
 The owner knows C and is learning Python as a verification tool. Group related
 instructions to keep progress fast. Do not repeat completed DAY11 exercises,
@@ -1629,8 +1629,8 @@ test logic. Direct RTL/test replacement requires an explicit request. Document
 updates, Git commits, pushes, tags, and releases each require applicable owner
 authorization. Do not treat a request to run tests as permission to change them.
 
-For this DAY16 closeout, documentation updates and a combined commit/push are
-authorized; v0.4+ implementation and release-tag creation are not.
+For this DAY17 closeout, documentation updates and a combined commit/push are
+authorized; v0.5+ implementation and release-tag creation are not.
 
 ---
 

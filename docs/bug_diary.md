@@ -1,8 +1,8 @@
 # Bug Diary
 
 This diary records actual development failures and intermediate review findings,
-not hypothetical bugs or invented fault-injection evidence. Updated for DAY16
-on 2026-09-19.
+not hypothetical bugs or invented fault-injection evidence. Updated for DAY17
+on 2026-09-20.
 
 ## DAY11 — Simulator value used as a Python dictionary key
 
@@ -71,6 +71,24 @@ working files passed lint, regression, and synthesis.
 Coverage boundary, not a resolved bug: the current directed tests do not cover
 the reverse ordering or equality boundary for BLT/BGE/BLTU/BGEU. Initial-1
 program behavior remains explicitly waived by the owner.
+
+## DAY17 — Subword boundary test initialization
+
+- **Recorded:** 2026-09-20 during the v0.4 subword memory verification.
+- **Symptom:** `test_subword_lane_boundaries` initially omitted its own clock,
+  reset, and x1/x2 setup. The simulator shut down prematurely and the selected
+  run produced cascading zero-nanosecond failures.
+- **Root cause:** the new cocotb case depended on initialization performed by a
+  different test instead of establishing its own DUT and register state.
+- **Fix:** initialize the clock, reset, instruction input, load-data input, and
+  address registers inside the case before driving the store/load boundary
+  vectors.
+- **Validation:** the current case runs independently as part of the existing
+  `test_lw_sw` module; the v0.4 core target and full regression pass without a
+  skipped case.
+- **Lesson:** every cocotb case that can run independently must own its clock,
+  reset, inputs, and architectural preconditions. A simulator shutdown can
+  otherwise create misleading zero-time follow-on failures.
 
 Copy this template when a new issue is actually encountered.
 

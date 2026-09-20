@@ -1,23 +1,26 @@
 # P1 Development Progress
 
-Last updated: 2026-09-19
+Last updated: 2026-09-20
 
 ## Current Status
 
-**DAY16 / P1 v0.3 — branch implementation checkpoint and
+**DAY17 / P1 v0.4 — byte and halfword memory implementation checkpoint and
 documentation/Git closeout.**
 
-The 27-instruction single-cycle subset executes PC-indexed programs using
-external Python instruction/data memories. The latest full regression passed
-24/24 cases across seven groups, and the core target passed 11/11. The v0.3
-branch implementation is present and its current tests pass, but relational
-branch coverage is not complete: the BLT/BGE and BLTU/BGEU reverse directions
-and equality boundaries remain unverified.
+The 33-instruction single-cycle subset executes PC-indexed programs using
+external Python instruction/data memories. The latest full regression covers
+seven groups with 26/26 cocotb cases passing, and the core target passes 13/13.
+The decoder test is one cocotb case containing 37 vectors. These are separate
+from the 33 static instruction types; the current harness does not emit a
+dynamic-instruction execution count.
 
-The owner authorized a combined code/documentation commit and push for this
-v0.3 closeout. No Git tag or GitHub Release was requested. Use `git log`,
-remote verification, and the final closeout message for the resulting commit;
-this document does not equate a version label with a published release tag.
+v0.4 adds LB/LBU/LH/LHU/SB/SH with a byte-addressed little-endian contract,
+lane-aligned store data, `data_write_strb[3:0]`, and signed/zero-extended load
+writeback. The owner authorized a combined code/documentation commit and push
+for this v0.4 closeout. No Git tag or GitHub Release was requested. Use
+`git log`, remote verification, and the final closeout message for the
+resulting commit; this document does not equate a version label with a
+published release tag.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -492,7 +495,7 @@ explicitly unverified. There is still no byte/halfword memory, remaining branch
 group, U/J instruction, whole-core reference interpreter, formal proof, STA,
 physical area, or Fmax result.
 
-## DAY16 — P1 v0.3 Branch Extension
+## DAY16 — P1 v0.3 Branch Extension (historical checkpoint)
 
 Owner-written v0.3 changes are present in `rtl/decoder.sv`,
 `rtl/rv32i_core.sv`, `tb/test_decoder.py`, and `tb/test_beq.py`. The decoder
@@ -539,6 +542,51 @@ records observed behavior and evidence boundaries; passing tools do not by
 themselves establish a complete independent explanation of every branch
 corner case.
 
+## DAY17 — P1 v0.4 Byte and Halfword Memory
+
+Owner-written v0.4 changes are present in `rtl/decoder.sv`,
+`rtl/rv32i_core.sv`, `tb/test_decoder.py`, and `tb/test_lw_sw.py`. The decoder
+adds LB/LBU/LH/LHU/SB/SH encodings. The core keeps `data_write_en`, adds
+`data_write_strb[3:0]`, lane-aligns SB/SH/SW write data, selects byte/halfword
+lanes from the full 32-bit byte address, and sign- or zero-extends loads.
+
+The contract is byte-addressed little-endian. LB/LBU/SB may use any byte
+address. LH/LHU/SH are supported only when address bit 0 is zero, and LW/SW
+only when address bits [1:0] are zero. `data_read_data` is an aligned 32-bit
+word supplied by the external cocotb/Python memory model; the current one-word
+interface does not assemble or split accesses that span two aligned words and
+does not raise a misalignment trap. Such misaligned halfword/word accesses are
+unsupported and unverified, not supported behavior.
+
+The Python helpers `read_word` and `apply_write` own the byte dictionary,
+little-endian word assembly, and strobe-preserving writes. The Makefile already
+includes `test_lw_sw` through `CORE_TEST_MODULES`; no redundant test-module
+entry was added. `test_subword_load_store` checks sign/zero extension, lane
+selection, aligned halfword behavior, and byte preservation. The independent
+`test_subword_lane_boundaries` case checks all byte lanes and both aligned
+halfword lanes.
+
+Observed verification for the v0.4 implementation:
+
+- `make lint-core`: exit 0 with the existing reviewed immediate-generator
+  `UNUSEDSIGNAL` warning only.
+- `make test-core`: 13/13 cases passed, 0 failed, 0 skipped.
+- `make regression SEED=20260920`: seven groups, 26/26 cases passed, 0 failed,
+  0 skipped, exit status 0.
+- `tb/test_decoder.py`: one cocotb case with 37 decoder vectors. The
+  implemented subset is 33 instruction types. Dynamic instruction executions
+  are not counted by the current testbench or regression runner.
+- Fresh generic Yosys synthesis: 6142 full-hierarchy primitive cells, 0
+  `check -assert` problems, 0 memory objects, and no inferred combinational
+  latch. The result is structural evidence only, not physical area, Fmax, or
+  STA evidence.
+
+During v0.4 verification, `test_subword_lane_boundaries` initially omitted its
+own clock/reset/x1/x2 setup. The simulator then shut down prematurely and
+produced cascading zero-nanosecond failures. The case was fixed to initialize
+its own clock, reset, instruction input, load input, and address registers;
+the current case runs independently.
+
 ## Current integration boundary and open work
 
 - Core instruction and data ports connect to external Python memory models.
@@ -547,43 +595,43 @@ corner case.
 - Initial 1 is intentionally unverified. The full runner error-path matrix,
   exhaustive ISA/invalid-encoding coverage, and whole-core reference interpreter
   are not implemented/verified.
-- No byte/halfword addressing contract, jump/U/J support, bus handshake, trap,
-  pipeline, STA, physical area, or Fmax claim.
-- The planned 2026-09-18 v2.0 target date has passed, but this repository is
-  still at v0.3. The schedule does not lower the verification standard or
-  turn this checkpoint into a v2.0 release.
+- Misaligned halfword/word accesses that would span two aligned words remain
+  unsupported/unverified because the one-word external interface does not
+  assemble or split them; no misalignment or access-fault exception exists.
+- No U/J instruction support, bus handshake, trap, pipeline, STA, physical
+  area, or Fmax claim.
+- The planned 2026-09-18 v2.0 target date has passed. The schedule does not
+  lower the verification standard or turn this checkpoint into a v2.0 release.
 - Reports, netlists, and waves are ignored by Git; tracked documents preserve
   the commands and observed summaries. Future runs regenerate local evidence.
 
-## Next-session handoff — start v0.4, not v0.3
+## Next-session handoff — start v0.5, not v0.4
 
-DAY: DAY16 / v0.3 implementation checkpoint and documentation/Git closeout.
+DAY: DAY17 / v0.4 implementation checkpoint and documentation/Git closeout.
 
-Completed: 27-instruction single-cycle core, v0.3 branch selection with
-signed/unsigned comparisons, owner-written directed branch cases, 24/24
-full-regression evidence, current lint, v0.3 generic synthesis, and updated
+Completed: 33-instruction single-cycle core, v0.3 branch selection with
+signed/unsigned comparisons, v0.4 byte/halfword memory operations,
+`data_write_strb` lane control, owner-written directed memory cases, 26/26
+full-regression evidence, current lint, v0.4 generic synthesis, and updated
 checkpoint documents.
 
 Owner work demonstrated: branch decoder extension, `branch_type` interface
-completion, signed versus unsigned comparison selection, no-side-effect
-expectations, PC-indexed instruction driving, and external memory-model
-behavior. The owner has not claimed an independent whole-core reference model,
-formal proof, exhaustive branch coverage, STA, or physical PPA result.
+completion, signed versus unsigned comparison selection, byte-lane and strobe
+selection, sign/zero extension, no-side-effect expectations, PC-indexed
+instruction driving, and external memory-model behavior. The owner has not
+claimed an independent whole-core reference model, formal proof, exhaustive
+branch or invalid-encoding coverage, STA, or physical PPA result.
 
 Still explicitly unverified: initial-1 loop behavior; the reverse and
 equality boundaries for BLT/BGE/BLTU/BGEU; exhaustive ISA/invalid-encoding
-coverage; and the full regression-runner error matrix. Initial 5 remains
-historical evidence only, while the current default loop uses initial 0.
+coverage; misaligned halfword/word accesses; and the full regression-runner
+error matrix. Initial 5 remains historical evidence only, while the current
+default loop uses initial 0.
 
-v0.4 remains a plan only. First define the byte-addressed little-endian
-contract, including low-address-bit lane selection, write strobes that preserve
-unwritten bytes, signed/zero extension, and the alignment/access-exception
-behavior. Only after that contract is agreed should the owner change
-`rtl/rv32i_core.sv` and the Python data-memory model and add the corresponding
-tests. The first file to revisit is `docs/specification.md`; the first RTL
-module after that contract is `rtl/rv32i_core.sv`.
+Next milestone is v0.5: define and review U/J immediate and jump semantics
+before changing the core. Preserve the v0.3 relational-branch gaps, the
+initial-1 waiver, and the v0.4 misalignment boundary when planning that work.
 
 Read first: `PROJECT_PLAN.md`, `README.md`, `docs/specification.md`, this
-handoff, and the current RTL/tests. Preserve mentor mode; do not repeat
-completed exercises or turn the v0.4 plan into implementation during the next
-handoff.
+handoff, and the current RTL/tests. Preserve mentor mode and do not repeat
+completed exercises.

@@ -166,7 +166,35 @@ always_comb begin
         end
 
         LW: begin
+            if (funct3 == 3'b000) begin
+                reg_write  = 1'b1;
+                alu_src    = 1'b1;
+                result_src = 1'b1;
+                imm_type   = IMM_I;
+                alu_op     = ALU_ADD;
+            end
+            if (funct3 == 3'b001) begin
+                reg_write  = 1'b1;
+                alu_src    = 1'b1;
+                result_src = 1'b1;
+                imm_type   = IMM_I;
+                alu_op     = ALU_ADD;
+            end
             if (funct3 == 3'b010) begin
+                reg_write  = 1'b1;
+                alu_src    = 1'b1;
+                result_src = 1'b1;
+                imm_type   = IMM_I;
+                alu_op     = ALU_ADD;
+            end
+            if (funct3 == 3'b100) begin
+                reg_write  = 1'b1;
+                alu_src    = 1'b1;
+                result_src = 1'b1;
+                imm_type   = IMM_I;
+                alu_op     = ALU_ADD;
+            end
+            if (funct3 == 3'b101) begin
                 reg_write  = 1'b1;
                 alu_src    = 1'b1;
                 result_src = 1'b1;
@@ -176,6 +204,18 @@ always_comb begin
         end
 
         SW: begin
+            if (funct3 == 3'b000) begin
+                alu_src   = 1'b1;
+                mem_write = 1'b1;
+                imm_type  = IMM_S;
+                alu_op    = ALU_ADD;
+            end
+            if (funct3 == 3'b001) begin
+                alu_src   = 1'b1;
+                mem_write = 1'b1;
+                imm_type  = IMM_S;
+                alu_op    = ALU_ADD;
+            end
             if (funct3 == 3'b010) begin
                 alu_src   = 1'b1;
                 mem_write = 1'b1;

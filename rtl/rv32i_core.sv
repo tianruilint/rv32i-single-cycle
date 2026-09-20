@@ -6,7 +6,8 @@ module rv32i_core (
     output logic [31:0] current_pc,
     output logic [31:0] data_write_data,
     output logic [31:0] data_addr,
-    output logic data_write_en
+    output logic data_write_en,
+    output logic [3:0] data_write_strb
 );
 
 
@@ -37,6 +38,9 @@ logic [2:0]  branch_type_dec;
 logic        eq;
 logic        lt_signed;
 logic        lt_unsigned;
+logic [31:0] load_data;
+logic [7:0]  selected_byte;
+logic [15:0] selected_half;
 
 assign opcode = instr[6:0];
 assign funct3 = instr[14:12];
@@ -46,9 +50,74 @@ assign rs1_addr = instr[19:15];
 assign rs2_addr = instr[24:20];
 assign rd_addr = instr[11:7];
 assign alu_b = (alu_src) ? imm : rs2_data;
-assign wb_data = (result_src) ? data_read_data : alu_result;
+assign wb_data = (result_src) ? load_data : alu_result;
 assign data_addr = alu_result;
-assign data_write_data = rs2_data;
+always_comb begin
+    data_write_data = 32'b0;
+    data_write_strb = 4'b0000;
+
+    if (mem_write && !reset) begin
+        case (funct3)
+            3'b000: begin
+                case (alu_result[1:0])
+                    2'b00: begin
+                        data_write_data = {24'b0, rs2_data[7:0]};
+                        data_write_strb = 4'b0001;
+                    end
+                    2'b01: begin
+                        data_write_data = {16'b0, rs2_data[7:0], 8'b0};
+                        data_write_strb = 4'b0010;
+                    end
+                    2'b10: begin
+                        data_write_data = {8'b0, rs2_data[7:0], 16'b0};
+                        data_write_strb = 4'b0100;
+                    end
+                    2'b11: begin
+                        data_write_data = {rs2_data[7:0], 24'b0};
+                        data_write_strb = 4'b1000;
+                    end
+                    default: begin
+                        data_write_data = 32'b0;
+                        data_write_strb = 4'b0000;
+                    end
+                endcase
+            end
+
+            3'b001: begin
+                case (alu_result[1:0])
+                    2'b00: begin
+                        data_write_data = {16'b0, rs2_data[15:0]};
+                        data_write_strb = 4'b0011;
+                    end
+                    2'b10: begin
+                        data_write_data = {rs2_data[15:0], 16'b0};
+                        data_write_strb = 4'b1100;
+                    end
+                    default: begin
+                        data_write_data = 32'b0;
+                        data_write_strb = 4'b0000;
+                    end
+                endcase
+            end
+
+            3'b010: begin
+                if (alu_result[1:0] == 2'b00) begin
+                    data_write_data = rs2_data;
+                    data_write_strb = 4'b1111;
+                end
+                else begin
+                    data_write_data = 32'b0;
+                    data_write_strb = 4'b0000;
+                end
+            end
+
+            default: begin
+                data_write_data = 32'b0;
+                data_write_strb = 4'b0000;
+            end
+        endcase
+    end
+end
 assign data_write_en = (reset) ? 1'b0 : mem_write;
 assign eq = (rs1_data == rs2_data);
 assign lt_signed = ($signed(rs1_data) < $signed(rs2_data));
@@ -69,6 +138,32 @@ always_comb begin
 end
 assign take_target = branch_taken;
 assign target_pc = current_pc + imm;
+always_comb begin
+    case (alu_result[1:0])
+        2'b00: selected_byte = data_read_data[7:0];
+        2'b01: selected_byte = data_read_data[15:8];
+        2'b10: selected_byte = data_read_data[23:16];
+        2'b11: selected_byte = data_read_data[31:24];
+        default: selected_byte = 8'b0;
+    endcase
+end
+always_comb begin
+    case (alu_result[1:0])
+        2'b00: selected_half = data_read_data[15:0];
+        2'b10: selected_half = data_read_data[31:16];
+        default: selected_half = 16'b0;
+    endcase
+end
+always_comb begin
+    case (funct3)
+        3'b000: load_data = {{24{selected_byte[7]}}, selected_byte};
+        3'b001: load_data = {{16{selected_half[15]}}, selected_half};
+        3'b010: load_data = data_read_data;
+        3'b100: load_data = {24'b0, selected_byte};
+        3'b101: load_data = {16'b0, selected_half};
+        default: load_data = 32'b0;
+    endcase
+end
 
 pc u_pc (
     .clk        (clk),

@@ -113,6 +113,30 @@ async def test_decoder(dut):
 
         (0x63, 0b011, 0b0000000,
         (0, 0, 0, 0, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x03, 0b000, 0b0000000,
+        (1, 1, 0, 1, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x03, 0b001, 0b0000000,
+        (1, 1, 0, 1, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x03, 0b100, 0b0000000,
+        (1, 1, 0, 1, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x03, 0b101, 0b0000000,
+        (1, 1, 0, 1, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x23, 0b000, 0b0000000,
+        (0, 1, 1, 0, 0, IMM_S, ALU_ADD, NONE)),
+
+        (0x23, 0b001, 0b0000000,
+        (0, 1, 1, 0, 0, IMM_S, ALU_ADD, NONE)),
+
+        (0x03, 0b011, 0b0000000,
+        (0, 0, 0, 0, 0, IMM_I, ALU_ADD, NONE)),
+
+        (0x23, 0b111, 0b0000000,
+        (0, 0, 0, 0, 0, IMM_I, ALU_ADD, NONE)),
     ]
 
     for opcode, funct3, funct7, expected in vectors:

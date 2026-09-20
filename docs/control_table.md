@@ -1,6 +1,6 @@
-# v0.3 Decoder and Core Control Table
+# v0.4 Decoder and Core Control Table
 
-Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, DAY16 checkpoint, 2026-09-19.
+Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, DAY17 checkpoint, 2026-09-20.
 This table records current outputs, not a proposed replacement implementation.
 
 ## Encoding qualification
@@ -30,7 +30,13 @@ uses `0010011`; LW uses `0000011`; SW uses `0100011`; the branch group uses
 | SLLI | I | `001` | Must be `0000000` |
 | SRLI | I | `101` | Must be `0000000` |
 | SRAI | I | `101` | Must be `0100000` |
+| LB | load | `000` | Not checked |
+| LH | load | `001` | Not checked |
 | LW | load | `010` | Not checked |
+| LBU | load | `100` | Not checked |
+| LHU | load | `101` | Not checked |
+| SB | store | `000` | Not checked |
+| SH | store | `001` | Not checked |
 | SW | store | `010` | Not checked |
 | BEQ | branch | `000` | Not checked |
 | BNE | branch | `001` | Not checked |
@@ -67,7 +73,13 @@ ALU operation codes here are internal, not ISA funct3 values.
 | SLLI | 1 | 1 | 0 | 0 | 0 | I | SLL `0101` |
 | SRLI | 1 | 1 | 0 | 0 | 0 | I | SRL `0110` |
 | SRAI | 1 | 1 | 0 | 0 | 0 | I | SRA `0111` |
+| LB | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
+| LH | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
 | LW | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
+| LBU | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
+| LHU | 1 | 1 | 0 | 1 | 0 | I | ADD `0000` |
+| SB | 0 | 1 | 1 | 0 | 0 | S | ADD `0000` |
+| SH | 0 | 1 | 1 | 0 | 0 | S | ADD `0000` |
 | SW | 0 | 1 | 1 | 0 | 0 | S | ADD `0000` |
 | BEQ | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
 | BNE | 0 | 0 | 0 | 0 | 1 | B | SUB `0001` |
@@ -85,6 +97,15 @@ retain these assignments, rather than retaining a previous instruction's state.
 - `rf_we` is `reg_write` gated off by reset. The register file separately rejects
   writes to destination x0.
 - `data_write_en` is `mem_write` gated off by reset.
+- `data_addr` is the full 32-bit effective byte address. The core's memory
+  qualification uses `funct3` and the low address bits to select byte/halfword
+  lanes and to form `data_write_data` and `data_write_strb[3:0]`.
+- LB/LBU/SB select any byte lane. LH/LHU/SH select lanes 0/1 or 2/3 only;
+  LW/SW select all four lanes only at a four-byte-aligned address. The strobe
+  patterns are SB `0001/0010/0100/1000`, SH `0011/1100`, and SW `1111`.
+- `data_write_data` is lane-aligned, and a Python memory model must preserve
+  bytes whose strobe bits are zero. The one-word interface does not split or
+  assemble misaligned halfword/word accesses and has no misalignment trap.
 - `branch_type` uses `NONE=000`, `BEQ=001`, `BNE=010`, `BLT=011`, `BGE=100`,
   `BLTU=101`, and `BGEU=110`. `branch_taken` is `branch` plus the selected
   equality, signed-less-than, unsigned-less-than, or inverse comparison; it
@@ -95,7 +116,7 @@ retain these assignments, rather than retaining a previous instruction's state.
   SRAI. Invalid combinations have no register/memory write or branch side effect,
   but PC advances by four when not in reset. No illegal-instruction trap exists.
 
-The decoder unit test is one cocotb case containing 29 legal and boundary
+The decoder unit test is one cocotb case containing 37 legal and boundary
 vectors; it is not exhaustive. Valid OR/SLT and other architectural outcomes
 are also exercised by the integrated arithmetic chain;
 see [verification_plan.md](verification_plan.md) for the evidence boundary.

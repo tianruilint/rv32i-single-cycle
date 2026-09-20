@@ -1,6 +1,6 @@
-# v0.3 Learning and Ownership Notes
+# v0.4 Learning and Ownership Notes
 
-Recorded at DAY16, 2026-09-19. These are topics practiced or explained, not a
+Recorded at DAY17, 2026-09-20. These are topics practiced or explained, not a
 claim that every topic has passed an independent oral assessment.
 
 ## Owner-written work
@@ -9,6 +9,8 @@ claim that every topic has passed an independent oral assessment.
 - Primary cocotb stimulus, expected results, and architectural assertions.
 - v0.3 decoder branch-type selection, core branch comparison logic, and
   primary branch cases.
+- v0.4 decoder extension, byte/halfword lane selection, write strobes, and
+  primary subword memory cases.
 - PC-indexed program execution and external Python memory behavior.
 - The regression runner, rebuilt incrementally after the owner rejected an
   earlier complete assistant-written version.
@@ -29,6 +31,15 @@ the owner; no existing third-party CPU implementation was imported.
   x0 behavior and uninitialized x1-x31 must be treated separately.
 - Convert simulator values to Python integers before dictionary addressing.
   Supply load data before the consuming edge and sample settled signals.
+- A byte address and an aligned 32-bit external word are different interface
+  concepts. Low address bits select little-endian byte lanes; the Python model
+  owns word assembly and preserves bytes whose store strobe is clear.
+- `data_write_en` identifies the decoded store path, while
+  `data_write_strb[3:0]` identifies the byte lanes that may change. Store data
+  must be placed in the same lanes as the strobe bits.
+- LB/LH sign-extend and LBU/LHU zero-extend. Byte operations may use any byte
+  address; halfword and word alignment limits must be stated separately from
+  the absence of a misalignment trap.
 - BEQ targets the current PC plus its signed immediate. The core compares
   operands directly and suppresses register/memory write side effects.
 - `branch_type` separates BEQ/BNE from signed BLT/BGE and unsigned BLTU/BGEU.
@@ -45,7 +56,7 @@ the owner; no existing third-party CPU implementation was imported.
   different quantities. Historical evidence must not be relabeled as current
   default regression coverage.
 
-## v0.3 instruction-group lessons
+## v0.3 and v0.4 instruction-group lessons
 
 - Signed `SLT/SLTI` and unsigned `SLTU/SLTIU` use different comparison
   interpretations even though both return only 0 or 1. `SLTIU` still receives
@@ -59,10 +70,14 @@ the owner; no existing third-party CPU implementation was imported.
 - `reg_write` controls the register-file write port. `data_write_en` is the
   external data-memory write signal used by SW; an ALU instruction should not
   assert the latter.
-- The owner-written decoder test is one cocotb case containing 29 vectors; the
-  v0.3 core adds three branch cases and reaches 11 core cases. Instruction
-  count, vector count, and cocotb case count remain separate evidence
-  categories.
+- The v0.4 decoder test is one cocotb case containing 37 vectors; the core
+  target reaches 13 cases and the full regression reaches 26 cases. The
+  implemented subset contains 33 instruction types. Dynamic instruction
+  executions are not instrumented. Instruction-type, vector, cocotb-case, and
+  dynamic-instruction counts remain separate evidence categories.
+- A cocotb case must initialize its own clock, reset, inputs, and architectural
+  preconditions. The v0.4 lane-boundary case initially failed this rule and
+  produced a simulator shutdown followed by misleading zero-time failures.
 
 ## Explicit remaining understanding checks
 
@@ -81,8 +96,7 @@ Keep owner effort on architectural decisions, core RTL, reference expectations,
 and important test logic. Explain Python through the owner's C background when
 needed. Auxiliary argument parsing, log formatting, and Git commands are not
 separate line-by-line assignments. Group related instructions, preserve actual
-verification, honor explicitly skipped cases, and start at the nearest unfinished
-feature. v0.4 begins in the next conversation with a memory contract first:
-little-endian byte lanes, write strobes and byte preservation, signed/zero
-extension, and alignment/access exceptions. Do not implement that feature from
-this closeout note alone.
+verification, honor explicitly skipped cases, and start at the nearest
+unfinished feature. v0.5 begins with a contract for U/J immediates and jump
+PC/writeback behavior; do not implement that feature from this closeout note
+alone.

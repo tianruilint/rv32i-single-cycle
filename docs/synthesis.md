@@ -80,7 +80,7 @@ Verilator 5.050 returned status 0 and one visible `UNUSEDSIGNAL` warning at
 this module. I/S/B immediate extraction uses other fields, so the warning is
 accepted for this scope. Other core modules still use those instruction bits.
 
-The v0.3 command was rerun on 2026-09-19 with the same result. The historical
+The v0.4 closeout rerun on 2026-09-20 had the same result. The historical
 v0.2/day13 output remains in `reports/lint/day13-core.log`; no separate
 current-lint artifact is required for this closeout.
 `-Wno-fatal` permits completion with warnings; no warning class was hidden.
@@ -156,3 +156,34 @@ flip-flops, 0 memory objects, and 2394 MUX cells. The structural check reports
 branch selector, immediate, ALU, or next-PC processes. These are generic
 structural observations only. They do not establish technology-specific area,
 Fmax, slack, STA, placement, routing, or gate-level equivalence.
+
+## v0.4 rerun
+
+Reproduced on 2026-09-20 with the same WSL Ubuntu-24.04 toolchain after the
+byte/halfword decoder and core extension. The command was:
+
+`yosys -Q -T -l reports/synthesis/v0.4-core.log -p 'read_verilog -sv rtl/rv32i_core.sv rtl/pc.sv rtl/decoder.sv rtl/register_file.sv rtl/immediate_generator.sv rtl/alu.sv; synth -top rv32i_core; check -assert; stat; write_verilog -noattr build/synthesis/v0.4-rv32i_core.v'`
+
+The command exited 0. The generated log and netlist are ignored artifacts at
+`reports/synthesis/v0.4-core.log` and
+`build/synthesis/v0.4-rv32i_core.v`.
+
+| Scope | Cells |
+| --- | ---: |
+| alu | 1429 |
+| decoder | 172 |
+| immediate_generator | 78 |
+| pc | 143 |
+| register_file | 3167 |
+| rv32i_core, direct contents | 1158, including five child instances |
+| **Full hierarchy, primitive total** | **6142** |
+
+The hierarchy calculation is `1429 + 172 + 78 + 143 + 3167 + (1158 - 5) =
+6142`. The full hierarchy has 1024 `$_DFFE_PP_` register-file flip-flops,
+32 PC flip-flops, 2402 MUX cells, 0 memory objects, and 0 procedural processes
+after mapping. `check -assert` reported `Found and reported 0 problems.`
+Yosys reported no inferred latch for the decoder, immediate, ALU, next-PC,
+branch selector, load-data, byte/halfword selection, or write-data/strobe
+combinational processes. These are generic structural observations only. No
+technology-specific area, Fmax, slack, STA, placement, routing, or gate-level
+equivalence claim is made.
