@@ -1,6 +1,6 @@
-# v0.5 Verification Plan and Evidence
+# v1.0 Verification Plan and Evidence
 
-Checkpoint: 2026-09-21. Results below are observed, not proposed coverage.
+Checkpoint: 2026-09-22. Results below are observed, not proposed coverage.
 
 ## Layers and responsibilities
 
@@ -22,7 +22,7 @@ functional/line/branch coverage measurement in this checkpoint.
 Executed from the repository root in WSL:
 
 ```sh
-make regression SEED=20260921
+make regression SEED=20260922
 ```
 
 | Target | Test source | XML under reports/ | Cases / pass / fail / skip |
@@ -33,8 +33,8 @@ make regression SEED=20260921
 | test-pc | test_pc.py | pc.xml | 3 / 3 / 0 / 0 |
 | test-immediate-generator | test_immediate_generator.py | immediate_generator.xml | 1 / 1 / 0 / 0 |
 | test-decoder | test_decoder.py | decoder.xml | 1 / 1 / 0 / 0 |
-| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 15 / 15 / 0 / 0 |
-| **Total** | | | **28 / 28 / 0 / 0** |
+| test-core | test_core.py, test_lw_sw.py, test_beq.py, test_program.py | core.xml | 17 / 17 / 0 / 0 |
+| **Total** | | | **30 / 30 / 0 / 0** |
 
 Exit status: 0. Test count is distinct from vector count, instruction-type
 count, and dynamic-instruction count.
@@ -49,8 +49,8 @@ is inferred from the case or vector counts.
 `Makefile` keeps `CORE_TEST_MODULES := test_core,test_lw_sw,test_beq,test_program`;
 the two new subword cases are discovered through the existing `test_lw_sw`
 module, so no redundant regression entry was added.
-The two v0.5 core cases are in the existing `test_core.py` module and therefore
-also require no Makefile module-list change.
+The later negative-JAL and initial-one cases also use already selected modules,
+so no Makefile module-list change was required.
 
 ## Core cases and architectural expectations
 
@@ -63,23 +63,24 @@ also require no Makefile module-list change.
 | test_subword_lane_boundaries | All four byte lanes, both aligned halfword lanes, and load-side lane selection |
 | test_beq | Taken +8, not taken, negative -12 branch; a taken BEQ's write enables are checked inactive |
 | test_bne | Equal operands not taken and unequal operands taken; both branch write enables inactive |
-| test_blt_bge | Signed -1 versus 1: BLT taken and BGE not-taken; both branch write enables inactive |
-| test_bltu_bgeu | Unsigned 0xffffffff versus 1: BLTU not-taken and BGEU taken; both branch write enables inactive |
+| test_blt_bge | Signed -1 versus 1: both operand orders and equality for BLT/BGE, taken/not-taken PC, inactive write enables |
+| test_bltu_bgeu | Unsigned 0xffffffff versus 1: both operand orders and equality for BLTU/BGEU, taken/not-taken PC, inactive write enables |
 | test_program | Fetch at PC 0/4/8; final x3=12, PC=12 |
 | test_program2 | Current initial-0 program exits loop, stores/loads 0 at byte address 64, ends at PC=32 |
+| test_program2_initial_one | Runs the loop body once; final x1=0, x2=x3=memory[64]=1, PC=32 |
 | test_xor_sltu_instrs | XOR/XORI and SLTU/SLTIU results, including unsigned ordering and sign-extended immediate behavior |
 | test_shift_instrs | SLL/SLLI, SRL/SRLI, SRA/SRAI; shift amount 31, register source 32, final PC=52, and `data_write_en=0` |
 | test_upper_immediate_instrs | LUI at PC 0 and AUIPC at PC 4; expected x1/x2 values and no memory-write side effect |
 | test_jal_jalr_control_flow | PC path `0,4,8,16,20,40`, JAL/JALR links, odd-target bit-0 clearing, skipped destinations unchanged, and no memory write |
+| test_jal_negative_offset | Taken negative JAL target, `PC+4` link, and inactive memory write controls |
 
 This exercises the 37 supported instruction types, but does not prove all their
 input combinations or all side effects under every condition. In particular,
 not every unsupported encoding, reset/memory interaction, or misaligned
-halfword/word access is tested. The relational branch reverse directions and
-equality boundaries are not tested. The integrated jump test uses one positive
-JAL offset and one forward JALR target. A negative J immediate is checked at
-the component level, but a negative taken JAL, target bit 1 behavior, and an
-instruction-address-misalignment exception are not integrated/verified.
+halfword/word access is tested. The integrated jump tests check positive and
+negative JAL offsets and a forward JALR target. Target bit 1 behavior and an
+instruction-address-misalignment exception are outside the implemented
+four-byte-aligned instruction interface.
 Current tests inspect internal register
 storage for some assertions; that hierarchy is a test dependency, not a stable
 external hardware interface.
@@ -89,8 +90,8 @@ external hardware interface.
 | Initial counter | Evidence | Current default case? |
 | --- | --- | --- |
 | 5 | Historical DAY11 run: x1=0, x2=x3=memory[64]=15, PC=32; six-case report passed, 586 ns | No; later replaced by initial 0 |
-| 0 | Latest fifteen-case core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
-| 1 | Explicitly skipped by the owner | No; unverified |
+| 0 | Current core regression passes; x1=x2=x3=memory[64]=0, PC=32 | Yes |
+| 1 | Current core regression passes; x1=0, x2=x3=memory[64]=1, PC=32 | Yes |
 
 Initial-5 historical XML: `reports/day11-program2-review2/core.xml`.
 Initial-zero waveform: `waves/day11-zero-wave/core.fst` (1931 bytes), with
@@ -98,10 +99,8 @@ Initial-zero waveform: `waves/day11-zero-wave/core.fst` (1931 bytes), with
 The historical PC trace was inspected as `0 -> 4 -> 8 -> 24 -> 28 -> 32`;
 the loop body is bypassed before SW and LW at address 64.
 
-The current regression does not execute the nonzero loop body in test_program2.
-If retaining both 0 and 5 as permanent tests becomes desired, obtain agreement
-and have the owner add that case; do not silently change the baseline during
-documentation work. Do not add initial 1 after it was explicitly waived.
+The current initial-one case executes the loop body once. Initial 5 remains
+historical evidence, not a third default case.
 
 ## Memory-model ordering
 
@@ -139,7 +138,7 @@ build with no parsed report must not be interpreted as zero failures overall.
 The full success path was executed. The XML reader was also checked against
 the retained real `LogicArray` failure report and returned `(2, 1, 1)` for
 total/failed/skipped. The skipped case in that historical report was excluded
-by test selection; it was not the waived initial-1 boundary test.
+by test selection.
 The complete runner error-path matrix has not been dynamically validated.
 
 Logs: `reports/regression/<target>.log`, stdout and stderr combined, overwritten
@@ -148,7 +147,7 @@ immutable run archive is generated. A failure opening a log or launching Make
 is not handled by the report-parsing exception handler.
 
 `--seed` is parsed by the runner and passed through the subprocess environment
-as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260921`.
+as `COCOTB_RANDOM_SEED`. All seven current logs confirm `20260922`.
 `random.Random(20260906)` in the ALU test is independently seeded. Reproduction
 also requires the same source, test selection, and compatible toolchain; the
 seed alone is not a complete environment record.
@@ -176,10 +175,9 @@ concurrently.
 For each agreed group: define semantics/encoding and hardware corner cases,
 let the owner implement RTL and principal tests, run directed and useful
 boundary tests, inspect any real failure, then rerun the existing regression.
-The v0.4 memory contract and v0.5 upper-immediate/jump contract are implemented
-and tested at their documented boundaries. Only claim newly implemented
-instruction support after those tests execute. Formal verification, exhaustive coverage, a dynamic
-instruction counter, and a whole-core reference model remain separate future
-decisions, not existing results. The next milestone is v1.0 stabilization,
-including review of remaining correctness gaps and a real basic timing-analysis
-setup.
+The v1.0 single-cycle baseline is verified within its documented interface.
+Only claim newly implemented instruction support after those tests execute.
+Formal verification, exhaustive coverage, a dynamic instruction counter, and
+a whole-core reference model are not existing results. The next milestone is
+the five-stage v2.0 pipeline; its hazards and flush/stall behavior need their
+own directed verification before comparison with this baseline.

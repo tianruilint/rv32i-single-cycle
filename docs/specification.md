@@ -1,7 +1,7 @@
-# P1 v0.5 Implemented Processor Specification
+# P1 v1.0 Implemented Processor Specification
 
-Checkpoint: DAY18, 2026-09-21. This document specifies the implemented subset,
-not the complete RV32I ISA or the future v1.0+ design.
+Checkpoint: 2026-09-22. This document specifies the implemented single-cycle
+subset, not the complete RV32I ISA or the future v2.0 pipeline.
 
 ## Scope
 
@@ -11,7 +11,7 @@ input and a separate external data-memory interface. The synthesized top is
 `immediate_generator`, and `alu`.
 
 Instruction and data memories are supplied by cocotb/Python. No RTL instruction
-ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v0.5.
+ROM, data RAM, SRAM macro, bus fabric, cache, or pipeline is part of v1.0.
 Automated tests check register values, memory values, PC, and selected control
 signals. They do not establish complete ISA compliance.
 
@@ -135,7 +135,7 @@ selected lane, SH places `rs2[15:0]` in lanes 0/1 or 2/3, and SW uses all four
 lanes. Strobe bit 0 corresponds to the lowest-address byte, so the supported
 patterns are SB `0001/0010/0100/1000`, SH `0011/1100`, and SW `1111`.
 
-Alignment limits are part of the v0.5 contract: LB/LBU/SB may use any byte
+Alignment limits are part of the v1.0 contract: LB/LBU/SB may use any byte
 address; LH/LHU/SH require `data_addr[0] == 0`; and LW/SW require
 `data_addr[1:0] == 2'b00`. Misaligned halfword/word accesses may span two
 aligned words. The current one-word external interface does not assemble or
@@ -212,32 +212,34 @@ shift-immediate forms are the deliberate exception described above.
 - FENCE, ECALL, EBREAK, CSR/privileged/trap/interrupt machinery.
 - Variable-latency memories, buses, caches, MMU, and pipeline hazards.
 - Assembly-to-image automation, whole-core ISA reference interpreter, formal
-  equivalence, technology-mapped PPA, and STA.
+  equivalence, and physical PPA/signoff. A basic core-only pre-layout STA run
+  exists, but not a memory-inclusive or post-layout timing result.
 
 Future targets are defined in [PROJECT_PLAN.md](../PROJECT_PLAN.md), not by
 silently extending this implemented specification.
 
 ## Validation boundary
 
-The 2026-09-21 v0.5 regression passed 28/28 cocotb cases across seven groups,
-including 15 core cases. The immediate-generator and decoder tests are one
+The 2026-09-22 v1.0 regression passed 30/30 cocotb cases across seven groups,
+including 17 core cases. The immediate-generator and decoder tests are one
 case each with 13 and 42 vectors. The implemented subset is 37 instruction
 types; the current harness does not report
 a dynamic-instruction execution count. Branch tests cover BNE equality and
-inequality, one signed BLT/BGE ordering, and one unsigned BLTU/BGEU ordering,
-with branch write enables checked inactive. Subword tests cover aligned lane
+inequality, both operand orders and equality for signed BLT/BGE and unsigned
+BLTU/BGEU, with branch write enables checked inactive. Subword tests cover aligned lane
 selection, sign/zero extension, strobe patterns, and preservation of bytes not
 selected by a store.
 
-The reverse-direction and equality boundaries for BLT/BGE/BLTU/BGEU remain
-unverified. Initial 5 is historical evidence, initial 0 is the current saved
-program, and initial 1 remains intentionally unverified. Misaligned
-halfword/word accesses are unsupported and unverified. Generic v0.5 synthesis
+Initial 5 is historical evidence; initial 0 and initial 1 are current saved
+program cases. Misaligned halfword/word accesses are unsupported. Generic synthesis
 passed with no inferred combinational latch and 0 problems from `check -assert`,
 with 6642 generic cells. The upper-immediate case verifies LUI/AUIPC results;
 the jump case verifies JAL/JALR link addresses, JALR bit-0 clearing, the PC path,
-and no effects from two skipped instructions. Negative integrated JAL behavior
-and targets with bit 1 set remain unverified. Neither this nor the directed
-regression proves all possible executions correct. See
-[verification_plan.md](verification_plan.md) and [synthesis.md](synthesis.md)
-for exact evidence and open coverage gaps.
+no effects from two skipped instructions, and a separate negative JAL target.
+Basic Nangate45-typical core-only STA at an assumed 10 ns target reported
++5.202 ns worst setup slack, with 15 maximum-slew violations. External memory
+timing and physical effects are absent, so this does not establish a CPU Fmax.
+Neither this nor the directed regression proves all possible executions
+correct. See [verification_plan.md](verification_plan.md),
+[synthesis.md](synthesis.md), and [timing/README.md](../timing/README.md)
+for exact evidence and limitations.

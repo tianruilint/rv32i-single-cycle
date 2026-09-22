@@ -1,27 +1,25 @@
 # P1 Development Progress
 
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Current Status
 
-**DAY18 / P1 v0.5 — U-type and jump implementation, verification, and
-documentation/Git closeout.**
+**P1 v1.0 — stable expanded single-cycle CPU engineering closeout.**
 
 The 37-instruction single-cycle subset executes PC-indexed programs using
 external Python instruction/data memories. The latest full regression covers
-seven groups with 28/28 cocotb cases passing, and the core target passes 15/15.
+seven groups with 30/30 cocotb cases passing, and the core target passes 17/17.
 The immediate-generator and decoder tests are one cocotb case each, containing
 13 and 42 vectors respectively. These are separate from the 37 static
 instruction types; the current harness does not emit a dynamic-instruction
 execution count.
 
-v0.5 adds LUI/AUIPC/JAL/JALR, U/J immediate generation, PC-relative ALU input,
-`PC+4` link writeback, direct and indirect next-PC selection, and JALR target
-bit 0 clearing. The owner authorized a combined code/documentation commit and
-push for this v0.5 closeout. No Git tag or GitHub Release was requested. Use
-`git log`, remote verification, and the final closeout message for the
-resulting commit; this document does not equate a version label with a
-published release tag.
+The v1.0 pass adds directed reverse/equality branch checks, an initial-one
+loop/store/load program case, and a taken negative JAL case without changing
+the 37-instruction RTL. Generic synthesis, Nangate45-typical mapping, and
+basic core-only pre-layout STA have been performed. The STA result is not an
+Fmax or physical timing-closure claim. No Git tag or GitHub Release is implied
+by the version label.
 
 The authoritative working repository is `D:\projects\rv32i-single-cycle`
 (`/mnt/d/projects/rv32i-single-cycle` in WSL).
@@ -625,61 +623,57 @@ their destination registers. J-immediate extraction also includes a negative
 with bit 1 set, and instruction-address misalignment exceptions remain
 unverified.
 
-## Current integration boundary and open work
+## P1 v1.0 engineering closeout — 2026-09-22
 
-- Core instruction and data ports connect to external Python memory models.
-- PC-indexed program execution is implemented; there is no RTL memory macro.
-- Default regression retains initial 0, not both initial 0 and initial 5.
-- Initial 1 is intentionally unverified. The full runner error-path matrix,
-  exhaustive ISA/invalid-encoding coverage, and whole-core reference interpreter
-  are not implemented/verified.
-- Misaligned halfword/word accesses that would span two aligned words remain
-  unsupported/unverified because the one-word external interface does not
-  assemble or split them; no misalignment or access-fault exception exists.
-- No bus handshake, instruction/data access exception, trap, pipeline, STA,
-  physical area, or Fmax claim.
-- JALR clears target bit 0. The instruction model otherwise assumes
-  four-byte-aligned PCs; targets with bit 1 set are unsupported/unverified and
-  do not raise an instruction-address-misaligned exception.
-- The planned 2026-09-18 v2.0 target date has passed. The schedule does not
-  lower the verification standard or turn this checkpoint into a v2.0 release.
-- Reports, netlists, and waves are ignored by Git; tracked documents preserve
-  the commands and observed summaries. Future runs regenerate local evidence.
+The same 37-instruction, owner-written single-cycle RTL remains the baseline.
+The current regression contains both initial-zero and initial-one programs,
+signed/unsigned relational branches in both operand orders and equality, and
+positive/negative JAL target checks. No pipeline RTL was introduced.
 
-## Next-session handoff — start v1.0 stabilization, not v0.5
+Evidence: `make test-core` passed 17/17; `make regression SEED=20260922`
+passed seven groups and 30/30 cocotb cases (0 failed, 0 skipped). The
+immediate-generator and decoder cases contain 13 and 42 vectors; the 37
+instruction types and dynamic executed-instruction count are different
+quantities. `make lint-core` exited 0 with one reviewed `UNUSEDSIGNAL` warning
+on unused immediate-generator opcode bits. Generic Yosys synthesis of the
+unchanged RTL reported 6642 cells and 0 `check -assert` problems; separate
+Nangate45-typical mapping reported 6267 library cells and 0 structural
+problems. No unintended latch or multiple driver was found.
 
-DAY / version: DAY18 / v0.5 U-type and jump closeout.
+Basic OpenSTA 2.6.0 analysis of the mapped core with a 10 ns assumed period
+reported +5.202 ns worst setup slack, from `instr[21]` to
+`data_write_data[10]`, with WNS/TNS 0. The report is
+`reports/timing/core_setup_nangate45_typ_10ns.txt`; constraints and the
+reproduction command are in `timing/`. The mapped netlist has 15 maximum-slew
+violations. External memory delays, physical routing, other corners, and
+gate-level equivalence were not analyzed, so neither a whole-CPU Fmax nor
+timing closure or silicon area is claimed.
 
-Completed: 37-instruction single-cycle core, v0.3 branch selection with
-signed/unsigned comparisons, v0.4 byte/halfword memory operations,
-`data_write_strb` lane control, and v0.5 LUI/AUIPC/JAL/JALR with U/J
-immediates, PC/writeback selection, and jump targets. Current evidence is
-28/28 full regression, 15/15 core cases, lint exit 0, and v0.5 generic
-synthesis with 0 structural problems.
+Actual development bugs remain in `docs/bug_diary.md`. The newly added v1.0
+directed cases passed without an RTL fix. Existing limits are the external
+zero-wait memory contract, no trap/misalignment handling, no variable-latency
+bus, and no whole-core formal proof or ISA interpreter. The planned
+2026-09-18 v2.0 target date has passed; the project does not relabel this
+single-cycle CPU as a pipeline to meet that date.
 
-Owner work demonstrated: branch decoder extension, `branch_type` interface
-completion, signed versus unsigned comparison selection, byte-lane and strobe
-selection, sign/zero extension, no-side-effect expectations, PC-indexed
-instruction driving, external memory-model behavior, U/J immediate assembly,
-PC-relative execution, `PC+4` link writeback, JALR bit-0 clearing, and skipped
-path checking. The owner has not claimed an independent whole-core reference
-model, formal proof, exhaustive branch/jump or invalid-encoding coverage, STA,
-or physical PPA result.
+## Next-session handoff — begin v2.0 from a preserved v1.0 baseline
 
-Still explicitly unverified: initial-1 loop behavior; the reverse and
-equality boundaries for BLT/BGE/BLTU/BGEU; exhaustive ISA/invalid-encoding
-coverage; misaligned halfword/word accesses; and the full regression-runner
-error matrix. Initial 5 remains historical evidence only, while the current
-default loop uses initial 0. Negative integrated JAL behavior, jump targets
-with bit 1 set, and an instruction-address-misalignment exception are also
-unverified or unsupported as specified.
+DAY / version: v1.0 single-cycle engineering closeout.
 
-Next milestone is v1.0 stabilization: reconcile the implemented instruction
-list, control/data-path documentation, high-value remaining verification gaps,
-and a real basic timing-analysis plan. Preserve the v0.3 relational-branch
-gaps, the initial-1 waiver, and the v0.4/v0.5 alignment boundaries instead of
-silently relabeling them as verified.
+Completed: 37-instruction RTL baseline, directed component/core/program
+regression, lint, generic and library-mapped synthesis, and basic core-only
+STA with its warnings and assumptions recorded.
 
-Read first: `PROJECT_PLAN.md`, `README.md`, `docs/specification.md`, this
-handoff, and the current RTL/tests. Preserve mentor mode and do not repeat
-completed exercises.
+Owner work demonstrated: core RTL, architectural control/data-path choices,
+primary cocotb tests and expectations, external memory-model behavior, and
+debugging of actual failures. Basic STA tool setup/reporting was assisted;
+independent explanation of its assumptions and limits should be checked before
+claiming personal STA proficiency.
+
+Next milestone: v2.0 five-stage pipeline, preserving the working v1.0 code and
+regression. First explain RAW hazards, forwarding limits, load-use stalls,
+stall versus bubble versus flush, wrong-path side effects, and CPI versus
+latency/throughput. Then define IF/ID/EX/MEM/WB responsibilities and the
+pipeline-register contract before writing any pipeline RTL. Start with
+`PROJECT_PLAN.md`, `README.md`, `docs/specification.md`, `docs/datapath.md`,
+and the current core/tests. No pipeline code belongs to this v1.0 closeout.

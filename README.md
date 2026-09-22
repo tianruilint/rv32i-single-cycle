@@ -3,8 +3,7 @@
 An owner-written educational 32-bit single-cycle CPU with automated
 SystemVerilog/Verilator/cocotb verification.
 
-**Current checkpoint: DAY18 / P1 v0.5 completed and verified,
-documented on 2026-09-21.**
+**Current checkpoint: P1 v1.0 single-cycle engineering closeout, 2026-09-22.**
 This is a verified **RV32I-subset** core, not a complete RV32I implementation.
 Version names identify development milestones; no Git tag or GitHub Release is
 implied.
@@ -57,7 +56,8 @@ checkout is `D:\projects\rv32i-single-cycle`, mounted at
 `/mnt/d/projects/rv32i-single-cycle`; the ChatGPT project mirror is separate.
 
 The verified tools are Verilator 5.050, cocotb 2.0.1, pytest 8.3.5, GTKWave
-3.3.116, and Yosys 0.33. See [environment notes](docs/environment.md).
+3.3.116, Yosys 0.33, and a project-local standalone OpenSTA 2.6.0 for basic
+timing analysis. See [environment notes](docs/environment.md).
 For a fresh Python environment only:
 
 ```sh
@@ -72,16 +72,16 @@ Do not recreate an existing working environment. Normal checks are:
 ```sh
 make env
 make lint-core
-make regression SEED=20260921
+make regression SEED=20260922
 ```
 
 `make regression` runs all seven test groups, reports case counts and failed
 targets, and returns a nonzero status on a detected failure. It must run from
 the repository root. `make test` alone still tests **only the full adder**.
 
-## Verified v0.5 results
+## Verified v1.0 results
 
-Full regression run on 2026-09-21:
+Full regression run on 2026-09-22:
 
 | Target | cocotb cases | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -91,18 +91,18 @@ Full regression run on 2026-09-21:
 | `test-pc` | 3 | 3 | 0 | 0 |
 | `test-immediate-generator` | 1 | 1 | 0 | 0 |
 | `test-decoder` | 1 | 1 | 0 | 0 |
-| `test-core` | 15 | 15 | 0 | 0 |
-| **Total** | **28** | **28** | **0** | **0** |
+| `test-core` | 17 | 17 | 0 | 0 |
+| **Total** | **30** | **30** | **0** | **0** |
 
 The process exited with status 0. These are cocotb test-case counts, not
 instruction-type counts, decoder-vector counts, dynamic-instruction counts, or
 coverage percentages. Any simulator time printed for the core target is a
 simulation detail, not an implementation-performance measurement.
 
-The fifteen core cases check arithmetic, reset write blocking, LW/SW, the
+The seventeen core cases check arithmetic, reset write blocking, LW/SW, the
 subword load/store sequence, byte and halfword lane boundaries, BEQ, BNE,
 signed BLT/BGE, unsigned BLTU/BGEU, PC-indexed straight-line execution, a
-zero-initialized loop/store/load program, XOR/unsigned comparisons, and the
+initial-zero and initial-one loop/store/load programs, XOR/unsigned comparisons, and the
 register/immediate shift group, LUI/AUIPC, and JAL/JALR control flow. The
 branch cases check `rf_we=0` and
 `data_write_en=0`; the subword cases also check `data_write_strb=0` for loads,
@@ -111,33 +111,36 @@ The shift case includes shift amount 31 and a register shift source of 32 to
 verify RV32's low-five-bit rule; it also checks that these ALU instructions do
 not assert `data_write_en`. The straight-line program finishes with
 `x3=12`, `PC=12`.
-The currently saved second program finishes with
-`x1=x2=x3=memory[64]=0`, `PC=32`.
+The initial-zero program finishes with `x1=x2=x3=memory[64]=0`, `PC=32`.
+The initial-one program executes the loop body once, then finishes with
+`x1=0`, `x2=x3=memory[64]=1`, `PC=32`. Signed and unsigned relational-branch
+tests now check both operand orders and equality, including taken/not-taken
+PC results and inactive write enables.
 
 The upper-immediate case checks LUI at PC 0 and AUIPC at PC 4, producing
 `x1=0xabcde000` and `x2=0x12345004`. The jump case observes the PC path
 `0 -> 4 -> 8 -> 16 -> 20 -> 40 -> 44`, checks JAL/JALR link values
 `x1=12` and `x3=24`, verifies JALR clears an odd target's bit 0, and confirms
 the skipped instructions leave their destination registers unchanged.
+An additional core case checks a taken negative JAL offset and its `PC+4`
+link without a memory-write side effect.
 
 The immediate-generator test is one cocotb case containing 13 vectors. The
 decoder test is one cocotb case containing 42 legal and boundary vectors.
 The integrated subset contains 37 instruction types. The current testbench and
 regression runner do not instrument or report a dynamic-instruction execution
-count; none is inferred from the 28 cocotb cases, 13 immediate vectors, or 42
+count; none is inferred from the 30 cocotb cases, 13 immediate vectors, or 42
 decoder vectors.
 
 The initial-5 loop previously passed with sum 15, but that variant was replaced
 by initial 0 in the saved test. It is **historical evidence, not an additional
-case in today's regression**. Initial 1 was explicitly skipped by the owner
-and remains unverified. The reverse-direction and equality boundaries for the
-four relational branches are also unverified; this is not exhaustive branch
-acceptance. See the
+case in today's regression**. The current directed branch and program cases
+do not imply exhaustive ISA coverage. See the
 [verification plan and evidence](docs/verification_plan.md).
 
 Each group refreshes its XML in `reports/`. The runner saves stdout and stderr
 to `reports/regression/<target>.log`, overwriting that target's previous log.
-All seven latest logs confirm supplied cocotb seed `20260921`.
+All seven latest logs confirm supplied cocotb seed `20260922`.
 The ALU's independent reference-vector generator uses fixed seed `20260906`;
 changing `SEED` does not change that generator.
 
@@ -171,14 +174,21 @@ No warning class was disabled. `-Wno-fatal` keeps warnings visible while
 allowing the command to complete; status 0 does not mean warning-free RTL.
 
 Generic Yosys synthesis and `check -assert` succeeded with 0 reported structural
-problems. The current v0.5 hierarchy contains **6642 generic cells**, including
+problems. The v0.5/v1.0 RTL hierarchy contains **6642 generic cells**, including
 1024 register-file enabled flip-flops, 32 PC flip-flops, 206 decoder cells, and
 216 immediate-generator cells;
 0 memory objects and 0 combinational latches were observed. These are
-tool/run-specific structural counts, **not silicon area or Fmax**. No target
-technology library, STA, post-layout timing, or gate-level equivalence result is
-claimed. The v0.4 count of 6142, v0.3 count of 5456, and v0.2 count of 5372
-are historical.
+tool/run-specific structural counts, **not silicon area or Fmax**. The v0.4
+count of 6142, v0.3 count of 5456, and v0.2 count of 5372 are historical.
+
+A separate Nangate45-typical mapping produced 6267 library cells and passed
+Yosys `check -assert`. Basic pre-layout, core-only STA at an **assumed** 10 ns
+period reported +5.202 ns worst setup slack (WNS/TNS 0). The path is
+`instr[21]` to `data_write_data[10]`. Fifteen maximum-slew violations remain;
+external memory timing, placement, routing, and other corners were not
+analyzed. This is neither timing closure nor a measured CPU Fmax. The
+[timing analysis record](timing/README.md) gives tools, constraints, warnings,
+and reproduction details. No gate-level functional equivalence result is claimed.
 
 The [synthesis record](docs/synthesis.md) contains the exact command, hierarchy,
 warning disposition, and reproduction instructions. Generated evidence:
@@ -186,6 +196,7 @@ warning disposition, and reproduction instructions. Generated evidence:
 - `reports/lint/day13-core.log`
 - `reports/synthesis/v0.5-core.log`
 - `build/synthesis/v0.5-rv32i_core.v` (generated netlist, not hand-written source)
+- `reports/timing/core_setup_nangate45_typ_10ns.txt` (tracked STA output)
 
 ## Repository map
 
@@ -195,9 +206,10 @@ warning disposition, and reproduction instructions. Generated evidence:
 | `tb/` | cocotb component, instruction, and program tests |
 | `scripts/run_regression.py` | Test scheduling, XML statistics, logs, seed forwarding |
 | `docs/` | Implemented specification, architecture, verification, and debug evidence |
+| `timing/` | Reproducible core-only STA constraints, script, and interpretation |
 | `PROJECT_PLAN.md` | Scope, mentor rules, and staged v1.0+ plan |
 | `PROGRESS.md` | Historical results and next-session handoff |
-| `build/`, `reports/`, `waves/` | Reproducible generated artifacts, ignored by Git |
+| `build/`, `reports/`, `waves/` | Generated artifacts; only the v1.0 STA report is retained in Git |
 
 ## Limitations and next session
 
@@ -221,12 +233,10 @@ warning disposition, and reproduction instructions. Generated evidence:
   exceptions are not implemented; targets with bit 1 set are unsupported and
   unverified under the current four-byte-aligned instruction-memory contract.
 
-This closeout completes **DAY18 / v0.5**. Start the next session with
-`PROJECT_PLAN.md`, `PROGRESS.md`, and `docs/specification.md` before planning
-the v1.0 stabilization pass. Preserve the documented v0.3 branch gaps,
-initial-1 waiver, v0.4 data-alignment boundary, and v0.5 instruction-target
-alignment boundary. Core RTL and primary verification logic remain the owner's
-work.
+This engineering closeout completes **P1 v1.0** within the documented external
+memory and timing limitations. Begin v2.0 by defining the five pipeline stage
+contracts and pipeline registers while preserving this single-cycle baseline.
+Core RTL and the principal verification architecture remain the owner's work.
 
 ## References and attribution
 
@@ -236,4 +246,5 @@ This repository is an educational implementation, not an imported third-party
 CPU core. Tool use and AI assistance with review, diagnostics, infrastructure,
 and documentation are distinct from the owner's RTL and verification work.
 
-Generated simulator output, reports, caches, and waveforms are ignored by Git.
+Generated simulator output, caches, and waveforms are ignored by Git. The
+v1.0 core-only STA report is the one intentionally tracked report.

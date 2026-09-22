@@ -1,6 +1,22 @@
 # Project Environment Audit
 
-## Current DAY16 audit — 2026-09-19
+## Current v1.0 timing-tool addition — 2026-09-22
+
+The authoritative checkout and WSL Ubuntu-24.04 toolchain remain D:-backed.
+Yosys 0.33 mapped the core to the pinned Nangate45 typical Liberty library.
+Standalone OpenSTA 2.6.0 from the OpenROAD 2024-12-14 Ubuntu 22.04 package
+was extracted under ignored `build/timing/`; it was not installed system-wide.
+A compatible `tcl-tclreadline` runtime was also extracted locally. The STA
+command, library hash, assumptions, and observed warning are in
+[`timing/README.md`](../timing/README.md); the checked report is in
+`reports/timing/core_setup_nangate45_typ_10ns.txt`. The startup message
+`Failed to load tclreadline.tcl` is nonfatal for this batch run. No physical
+implementation or memory timing model was installed or validated.
+
+The earlier DAY16 tool inventory and Git authentication notes below are
+historical observations, not a claim about a fresh system-wide installation.
+
+## Historical DAY16 audit — 2026-09-19
 
 The authoritative checkout is `D:\projects\rv32i-single-cycle`, mounted at
 `/mnt/d/projects/rv32i-single-cycle` in WSL distribution `Ubuntu-24.04`.
@@ -38,7 +54,8 @@ System PATH does not provide pytest/cocotb-config, which is expected: the
 Makefile uses the project-local `.venv`. Do not reinstall working dependencies.
 The RISC-V toolchain is installed, but current programs are literal instruction
 words in Python; automatic assembly/image generation is not implemented.
-No STA tool/library/constraint setup is validated at this checkpoint.
+No STA tool/library/constraint setup was validated at the DAY16 checkpoint;
+the v1.0 addition above supersedes that historical limit.
 
 ### Git authentication used for closeout
 

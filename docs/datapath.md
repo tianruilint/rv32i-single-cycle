@@ -1,10 +1,10 @@
-# v0.5 Single-cycle Datapath
+# v1.0 Single-cycle Datapath
 
-Implemented checkpoint: DAY18, 2026-09-21. Source top: `rtl/rv32i_core.sv`.
+Implemented checkpoint: 2026-09-22. Source top: `rtl/rv32i_core.sv`.
 The boxes inside the core are synthesizable logic. Both memory models below
 are cocotb/Python testbench components, not RTL RAMs.
 
-The v0.5 datapath keeps the v0.1 single-cycle structure. The decoder selects
+The v1.0 datapath keeps the v0.1 single-cycle structure. The decoder selects
 XOR, unsigned comparison, register/immediate shifts, six branch types, and the
 byte/halfword load/store group, plus LUI/AUIPC/JAL/JALR. Pipeline registers
 remain outside this checkpoint.
@@ -144,10 +144,20 @@ read bypass/write protection; do not infer that synthesis must remove exactly
 ## Timing boundary
 
 Addresses changing at a read port propagate through combinational selection;
-reads do not wait for a clock edge. Writes do. The overall load path may include
-register read, ALU address generation, external memory, and writeback. That is
-a candidate path to analyze later, not a measured critical path. See
-[synthesis.md](synthesis.md) for what has and has not been measured. The
-current v0.5 hierarchy reports 6642 generic cells; the v0.4 count of 6142,
-v0.3 count of 5456, and v0.2 count of 5372 are historical. These are generic
-structural counts, not physical area, Fmax, or STA.
+reads do not wait for a clock edge. Writes do. A full single-cycle load path
+would include register read, address generation, external memory, and writeback.
+The pre-layout core-only STA cannot measure that memory-inclusive path. Under
+the assumptions in [timing/README.md](../timing/README.md), its slowest
+reported path is instead `instr[21]` to `data_write_data[10]`: 4.198 ns arrival,
+9.400 ns required, +5.202 ns setup slack at an assumed 10 ns period. Fifteen
+maximum-slew violations and absent memory/wire timing prevent a timing-closure
+or Fmax claim. The unchanged RTL has 6642 generic Yosys cells and 6267 cells
+after Nangate45-typical mapping; neither count is physical area. See
+[synthesis.md](synthesis.md) for structural details.
+
+Under the testbench's zero-wait memory contract, a supported instruction
+commits at one rising edge, so its ideal CPI is approximately 1. This does not
+make it fast: a real single-cycle clock must accommodate the slowest complete
+instruction path, including memory where applicable. No measured physical
+clock period, dynamic CPI counter, or post-layout area is available for a
+quantitative comparison with the future pipeline.

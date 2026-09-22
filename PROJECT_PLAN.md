@@ -6,29 +6,30 @@
 >
 > Every Codex session MUST read this file before modifying the project.
 
-## Current checkpoint and session boundary — 2026-09-21
+## Current checkpoint and session boundary — 2026-09-22
 
-**DAY18 / P1 v0.5 is the completed U-type and jump implementation
-checkpoint.** Documentation plus a combined commit/push are authorized;
-v0.5 RTL/test changes are owner-written and frozen for this closeout.
+**P1 v1.0 is the completed single-cycle engineering baseline.** The 37-type
+RTL remains unchanged. v2.0 is the next milestone; no pipeline code is part of
+this checkpoint. The requested Git closeout does not include a tag or release.
 
 - Implemented: the 37-instruction single-cycle subset, PC-indexed Python
   instruction memory, external Python data memory, program-level tests,
   BNE/BLT/BGE/BLTU/BGEU, LB/LBU/LH/LHU/SB/SH, and
   LUI/AUIPC/JAL/JALR.
-- Latest full regression: seven groups, 28/28 cocotb cases, 0 failed/skipped,
+- Latest full regression: seven groups, 30/30 cocotb cases, 0 failed/skipped,
   exit status 0; seed forwarding and seven per-target logs verified.
-- Core target: 15/15 cases passed. Immediate and decoder tests are one case
+- Core target: 17/17 cases passed. Immediate and decoder tests are one case
   each with 13 and 42 vectors. The testbench does not report a dynamic-
   instruction count.
 - Lint: one reviewed immediate-generator `UNUSEDSIGNAL` warning, no error.
-- v0.5 generic Yosys synthesis: 6642 generic cells, no inferred combinational
-  latch, `check -assert` reports 0 problems, and 0 memory objects remain. No
-  technology-specific area or STA claim.
-- Current saved loop test uses initial 0. Initial 5 passed historically but is
-  not retained as a separate default case. Initial 1 remains explicitly skipped.
-- Relational branch reverse-direction and equality boundaries remain
-  unverified; the passing regression is not exhaustive branch acceptance.
+- Generic Yosys synthesis: 6642 cells, no inferred combinational latch,
+  `check -assert` reports 0 problems. Nangate45-typical mapping produced 6267
+  library cells and passed the structural check. Neither count is silicon area.
+- Current directed cases include initial-zero/initial-one loop behavior,
+  relational branch reverse/equality decisions, and a negative taken JAL.
+- Basic core-only pre-layout STA: assumed 10 ns target, +5.202 ns worst setup
+  slack, WNS/TNS 0, with 15 maximum-slew violations. External memories and
+  wire timing are absent; no timing-closure or Fmax claim follows.
 - Misaligned halfword/word accesses that would span two aligned words are
   unsupported and unverified; no misalignment or access-fault exception exists.
 - JALR target bit 0 clearing is verified. The instruction model assumes
@@ -36,10 +37,8 @@ v0.5 RTL/test changes are owner-written and frozen for this closeout.
   misalignment exceptions are unsupported/unverified.
 - DAY12 assembler-to-image automation is deferred, not completed. Automatic
   failure-wave generation was optional and is not implemented.
-- The planned 2026-09-18 v2.0 target date has passed; the repository remains
-  below v1.0 and the verification standard is not lowered.
-- v0.5 is a technical/documentation checkpoint. Commit/push are authorized
-  for this closeout; no Git tag or GitHub Release is requested.
+- The planned 2026-09-18 v2.0 target date has passed; v1.0 has now closed, but
+  v2.0 remains future work and its acceptance standard is not lowered.
 
 Authority order: latest explicit owner instruction, latest agreed milestone
 scope, this plan, then older chat/history. `docs/specification.md` describes
@@ -1408,35 +1407,31 @@ At this point P1 becomes a legitimate project artifact.
 
 # 22. Post-DAY18 — P1 v1.0 Development
 
-After v0.5 is stable enough to hand off its documented verification gaps:
-
-Stabilize the implemented single-cycle subset systematically. Add any further
-instruction scope only after it is explicitly defined and accepted.
+The v1.0 single-cycle implementation is the stable baseline for subsequent
+v2.0 pipeline work. Keep it available and verified while pipeline stages are
+added incrementally.
 
 The following v0.2-v0.5 names label the Phase A-D work. They are intermediate
 checkpoints on the path to v1.0, not release tags.
 
-| Milestone | Scope | Main owner-written work |
+| Milestone | Scope | Main work/evidence |
 | --- | --- | --- |
 | v0.2 / Phase A | XOR/XORI, shifts, SLTU/SLTIU | Decoder extension, shift-encoding qualification, instruction tests; **closed 2026-09-16** |
-| v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests; **implementation checkpoint 2026-09-19, reverse/equality gaps remain** |
+| v0.3 / Phase B | BNE, BLT, BGE, BLTU, BGEU | Branch selection, signed/unsigned comparison, taken/not-taken tests; **implementation checkpoint 2026-09-19; reverse/equality cases added in v1.0** |
 | v0.4 / Phase C | LB/LBU/LH/LHU/SB/SH | Byte-addressed memory contract, write masks, load selection/extension, tests; **closed 2026-09-20, misaligned halfword/word accesses remain unsupported/unverified** |
 | v0.5 / Phase D | LUI, AUIPC, JAL, JALR | U/J immediates, PC and writeback choices, jump tests; **closed 2026-09-21, instruction-target alignment exceptions remain unsupported/unverified** |
-| v1.0 | Stable expanded single-cycle CPU | Verification gaps, RTL fixes, reproducible synthesis and basic STA |
+| v1.0 | Stable expanded single-cycle CPU | **Closed 2026-09-22:** 30/30 regression, lint review, generic and library-mapped synthesis, basic core-only STA with limits recorded |
 | v2.0 | Five-stage pipeline, after the v1.0 stability gate | Pipeline registers, forwarding, hazards, stall/bubble/flush, tests |
 
-### Next-session starting task: v1.0 stabilization audit
+### Next-session starting task: v2.0 pipeline contract
 
-1. Read the v0.5 handoff in `PROGRESS.md`, confirm the checkout/remote state,
-   and keep the recorded relational-branch gaps, initial-1 waiver, data-access
-   alignment boundary, and instruction-target alignment boundary visible.
-2. Audit the 37-instruction list against decoder/core controls, specification,
-   and the existing directed tests before adding new RTL.
-3. Prioritize high-value correctness gaps and reproducible engineering
-   evidence. Do not silently restore the waived initial-1 case or claim
-   exhaustive ISA coverage.
-4. Define a real basic timing-analysis setup before reporting timing. Generic
-   Yosys cell counts and the cocotb clock are not area or Fmax evidence.
+1. Preserve the v1.0 source and regression as the reference baseline.
+2. Explain RAW hazards, forwarding limits, load-use stalls, stall/bubble/flush,
+   wrong-path side effects, and CPI versus instruction latency/throughput.
+3. Define IF/ID/EX/MEM/WB responsibilities and pipeline-register contents
+   before creating pipeline RTL. Start with the smallest hazard-free sequence.
+4. Keep the v1.0 external-memory and timing limits explicit; no physical Fmax
+   or area claim follows from the educational core-only STA.
 
 The owner knows C and is learning Python as a verification tool. Group related
 instructions to keep progress fast. Do not repeat completed DAY11 exercises,
@@ -1462,57 +1457,60 @@ P1 v1.0 is DONE only when:
 
 ## Architecture
 
-- [ ] supported instruction set documented
-- [ ] datapath documented
-- [ ] control logic documented
-- [ ] limitations documented
+- [x] supported instruction set documented
+- [x] datapath documented
+- [x] control logic documented
+- [x] limitations documented
 
 ## RTL
 
-- [ ] CPU core synthesizes
-- [ ] no known unintended latch
-- [ ] no unresolved multiple-driver issue
-- [ ] x0 behavior correct
-- [ ] reset behavior defined
-- [ ] signed operations correct
+- [x] CPU core synthesizes
+- [x] no known unintended latch
+- [x] no unresolved multiple-driver issue
+- [x] x0 behavior correct
+- [x] reset behavior defined
+- [x] signed operations correct
 
 ## Verification
 
-- [ ] instruction-level tests exist
-- [ ] program-level tests exist
-- [ ] register checks automatic
-- [ ] memory checks automatic
-- [ ] branches tested both directions
-- [ ] regression runs with one command
-- [ ] regression passes
+- [x] instruction-level tests exist
+- [x] program-level tests exist
+- [x] register checks automatic
+- [x] memory checks automatic
+- [x] branches tested both directions
+- [x] regression runs with one command
+- [x] regression passes
 
 ## Engineering
 
-- [ ] lint reviewed
-- [ ] synthesis completed
-- [ ] synthesis report stored
-- [ ] STA completed
-- [ ] timing report stored
-- [ ] major warnings reviewed
+- [x] lint reviewed
+- [x] synthesis completed
+- [x] synthesis report stored
+- [x] STA completed
+- [x] timing report stored
+- [x] major warnings reviewed
 
 ## Documentation
 
-- [ ] README complete
-- [ ] specification complete
-- [ ] datapath diagram complete
-- [ ] control table complete
-- [ ] verification plan complete
-- [ ] bug diary contains actual development bugs
-- [ ] measured results documented
-- [ ] third-party references acknowledged
+- [x] README complete
+- [x] specification complete
+- [x] datapath diagram complete
+- [x] control table complete
+- [x] verification plan complete
+- [x] bug diary contains actual development bugs
+- [x] measured results documented
+- [x] third-party references acknowledged
 
-Only then should P1 v1.0 be considered finished.
+P1 v1.0 meets these educational engineering criteria within the external-memory
+and core-only timing assumptions documented above. These checks do not assert
+formal equivalence, complete ISA coverage, timing closure, or physical PPA.
 
 ---
 
-# 24. P1 v2.0 — Optional CPU Design Extension
+# 24. P1 v2.0 — Five-stage CPU Design Extension
 
-P1 v2.0 is OPTIONAL.
+The owner has chosen to pursue v2.0 after the v1.0 closeout. It remains a
+separate milestone, not an accomplished feature of the current repository.
 
 It is intended especially for stronger CPU Design applications.
 
@@ -1637,9 +1635,9 @@ test logic. Direct RTL/test replacement requires an explicit request. Document
 updates, Git commits, pushes, tags, and releases each require applicable owner
 authorization. Do not treat a request to run tests as permission to change them.
 
-For this DAY18 closeout, documentation updates and a combined commit/push are
-authorized; v1.0 implementation beyond the documented closeout and release-tag
-creation are not.
+For the 2026-09-22 v1.0 closeout, the owner explicitly authorized document
+updates and a Git push. A commit is the necessary intermediate step; no tag,
+release, or pipeline RTL change is part of this authorization.
 
 ---
 

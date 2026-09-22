@@ -1,7 +1,8 @@
-# v0.5 Learning and Ownership Notes
+# v1.0 Learning and Ownership Notes
 
-Recorded at DAY18, 2026-09-21. These are topics practiced or explained, not a
-claim that every topic has passed an independent oral assessment.
+DAY18 owner-work notes were recorded on 2026-09-21; v1.0 engineering evidence
+was added on 2026-09-22. These are practiced or explained topics, not a claim
+that every topic has passed an independent oral assessment.
 
 ## Owner-written work
 
@@ -49,7 +50,8 @@ the owner; no existing third-party CPU implementation was imported.
   original 32-bit vectors. Greater-or-equal branches use the inverse of the
   corresponding less-than result.
 - Passing one ordering for each relational pair does not prove the reverse
-  ordering or equality boundary. Those remain explicit v0.3 follow-up checks.
+  ordering or equality boundary. The v1.0 directed cases now exercise both
+  operand orders and equality for BLT/BGE/BLTU/BGEU.
 - A successful simulation tests sampled behaviors; lint and synthesis examine
   different structural properties. None alone proves complete correctness.
 - A register array need not map to SRAM. The observed generic flow used
@@ -82,9 +84,9 @@ the owner; no existing third-party CPU implementation was imported.
 - `reg_write` controls the register-file write port. `data_write_en` is the
   external data-memory write signal used by SW; an ALU instruction should not
   assert the latter.
-- The v0.5 immediate and decoder tests are one cocotb case each containing 13
-  and 42 vectors; the core target reaches 15 cases and the full regression
-  reaches 28 cases. The implemented subset contains 37 instruction types.
+- The immediate and decoder tests are one cocotb case each containing 13
+  and 42 vectors; the v1.0 core target reaches 17 cases and the full regression
+  reaches 30 cases. The implemented subset contains 37 instruction types.
   Dynamic instruction
   executions are not instrumented. Instruction-type, vector, cocotb-case, and
   dynamic-instruction counts remain separate evidence categories.
@@ -101,7 +103,11 @@ complete independent datapath explanation from that exchange alone.
 
 Before claiming synthesis/STA expertise, independently explain what a generic
 cell count means, what a warning does and does not establish, and why a testbench
-clock period does not prove an achievable hardware frequency. STA has not run.
+clock period does not prove an achievable hardware frequency. Basic core-only
+STA has run, but tool execution by the assistant does not by itself establish
+the owner's independent understanding. The 10 ns target is assumed, setup
+slack is +5.202 ns, 15 maximum-slew violations remain, and external memory
+timing is absent.
 Before calling jump handling independently mastered, explain why JAL uses the
 current PC, why link data is `PC+4`, why JALR clears bit 0, and why skipped
 instructions cannot have side effects.
@@ -115,5 +121,6 @@ separate line-by-line assignments. Group related instructions, preserve actual
 verification, honor explicitly skipped cases, and start at the nearest
 unfinished feature. v1.0 begins with a stabilization audit of the implemented
 37-instruction core, its remaining high-value verification gaps, and the tool
-requirements for honest basic timing analysis; do not begin the v2.0 pipeline
-from this closeout note alone.
+limits of the completed basic timing analysis. The v2.0 pipeline begins with
+stage responsibilities and pipeline-register contracts, after the owner can
+explain RAW hazards, forwarding, load-use stalls, bubbles, and flushes.

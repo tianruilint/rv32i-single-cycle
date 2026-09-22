@@ -1,6 +1,6 @@
-# v0.5 Decoder and Core Control Table
+# v1.0 Decoder and Core Control Table
 
-Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, DAY18 checkpoint, 2026-09-21.
+Source: `rtl/decoder.sv` and `rtl/rv32i_core.sv`, v1.0 checkpoint, 2026-09-22.
 This table records current outputs, not a proposed replacement implementation.
 
 ## Encoding qualification

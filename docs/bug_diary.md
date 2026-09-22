@@ -1,8 +1,9 @@
 # Bug Diary
 
 This diary records actual development failures and intermediate review findings,
-not hypothetical bugs or invented fault-injection evidence. Updated for DAY18
-on 2026-09-21.
+not hypothetical bugs or invented fault-injection evidence. Historical DAY18
+entries were reviewed at the v1.0 closeout on 2026-09-22; the added directed
+cases found no new RTL bug.
 
 ## DAY11 — Simulator value used as a Python dictionary key
 
@@ -11,7 +12,7 @@ on 2026-09-21.
   `TypeError: unhashable type: 'LogicArray'` at simulated time 241 ns.
 - **Evidence:** `reports/day11-program2-review1/core.xml` contains the TypeError
   failure. Its two listed cases consist of one failed selected case and one
-  skipped case; that skipped case is unrelated to the waived initial-1 test.
+  skipped case from test selection.
 - **Root cause:** a simulator address value was passed directly to the Python
   memory dictionary instead of converting it to a hashable integer address.
 - **Owner fix:** use `int(dut.data_addr.value)` for dictionary addressing. The
@@ -67,9 +68,10 @@ working files passed lint, regression, and synthesis.
   signal was wired into the core. The final path selects equality, signed
   less-than, unsigned less-than, or the inverse relation.
 
-Coverage boundary, not a resolved bug: the current directed tests do not cover
-the reverse ordering or equality boundary for BLT/BGE/BLTU/BGEU. Initial-1
-program behavior remains explicitly waived by the owner.
+At the v0.3 checkpoint, reverse ordering and equality were not exercised for
+BLT/BGE/BLTU/BGEU. The v1.0 directed cases now exercise those paths, and the
+initial-one program case runs through the loop once. No RTL bug was found by
+these added cases.
 
 ## DAY17 — Subword boundary test initialization
 

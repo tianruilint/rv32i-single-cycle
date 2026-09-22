@@ -75,7 +75,7 @@ Executed separately:
 make lint-core
 ```
 
-The current v0.5 run with Verilator 5.050 returned status 0 and one visible
+The v1.0 rerun with Verilator 5.050 returned status 0 and one visible
 `UNUSEDSIGNAL` warning at `rtl/immediate_generator.sv:2`: opcode bits `[6:0]`
 are unused in this module. I/S/B/U/J immediate extraction uses the other
 instruction fields, so the warning is accepted for this scope. The core and
@@ -83,8 +83,8 @@ decoder still use the opcode bits.
 
 The v0.4 closeout rerun on 2026-09-20 reported `[19:12,6:0]` because U/J
 formats were not yet present. The historical
-v0.2/day13 output remains in `reports/lint/day13-core.log`; no separate
-current-lint artifact is required for this closeout.
+v0.2/day13 output remains in `reports/lint/day13-core.log`; the v1.0 lint
+result was observed directly from `make lint-core` on 2026-09-22.
 `-Wno-fatal` permits completion with warnings; no warning class was hidden.
 Revisit this disposition if immediate formats or interfaces change.
 
@@ -99,7 +99,8 @@ Revisit this disposition if immediate formats or interfaces change.
 The 10 ns cocotb clock is not a frequency result. A plausible single-cycle load
 path is register file -> ALU -> external data memory -> writeback; measuring it
 requires a defined memory implementation/timing model, library, and constraints.
-Basic STA remains part of the later v1.0 engineering work.
+This section describes the historical generic run. Basic core-only STA was
+subsequently performed for v1.0; see the final section below.
 
 ## v0.2 rerun
 
@@ -223,3 +224,30 @@ The increase from the historical v0.4 count of 6142 reflects this generic flow
 over changed RTL; it is not a physical area comparison. No technology-specific
 area, Fmax, slack, STA, placement, routing, or gate-level equivalence claim is
 made.
+
+## v1.0 technology-mapped core and basic STA
+
+On 2026-09-22, the unchanged v0.5 RTL was flattened and mapped with Yosys
+0.33 to the pinned Nangate45 typical Liberty library. `check -assert` reported
+0 structural problems, and `stat` reported 6267 library cells, including 1056
+`DFF_X1` cells. The mapping log is `build/timing/yosys_map.log`, the generated
+netlist is `build/timing/rv32i_core_nangate45.v`, and the exact mapping command
+and library SHA-256 are in [timing/README.md](../timing/README.md). This cell
+count and the Liberty cell-area sum are not a placed or routed silicon area.
+
+Yosys warned that unsupported scan-flop pin expressions were skipped during
+mapping; ordinary `DFF_X1` cells were mapped. ABC also reported multi-output
+gates in the library and that its network was combinational. Neither warning
+was hidden. The mapped design passed the final structural check, but there
+was no gate-level functional-equivalence run.
+
+OpenSTA 2.6.0 read that netlist and library with
+`timing/constraints.sdc`. `check_setup -verbose` passed. At an illustrative
+10 ns period, worst setup slack was +5.202 ns (WNS/TNS 0), from `instr[21]`
+to `data_write_data[10]`. The saved raw report is
+`reports/timing/core_setup_nangate45_typ_10ns.txt`. Fifteen maximum-slew
+violations remain, including 0.845 ns against a 0.199 ns library limit on a
+high-fanout driver. External instruction/data memory timing, clock-tree delay,
+wire parasitics, physical placement, and other process corners are absent.
+This is a basic educational core-only timing analysis, not timing closure,
+an achievable whole-CPU Fmax, or physical signoff.
